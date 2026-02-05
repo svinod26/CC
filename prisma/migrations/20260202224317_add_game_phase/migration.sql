@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "GamePhase" AS ENUM ('REGULATION', 'REDEMPTION', 'OVERTIME');
+
+-- AlterTable
+ALTER TABLE "GameState" ADD COLUMN     "phase" "GamePhase" NOT NULL DEFAULT 'REGULATION';
