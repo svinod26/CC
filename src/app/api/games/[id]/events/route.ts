@@ -53,6 +53,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!game || !game.state) {
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
   }
+  const isAdmin = session.user.role === 'ADMIN';
+  const isScorer = game.statTakerId && session.user.id === game.statTakerId;
+  if (!isAdmin && !isScorer) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (game.status === GameStatus.FINAL && !isAdmin) {
+    return NextResponse.json({ error: 'Game is finalized' }, { status: 403 });
+  }
 
   const currentTurn = game.turns[0];
   const phase = game.state.phase ?? 'REGULATION';

@@ -2,7 +2,8 @@
 
 import { GameState, GameType, ResultType, Team, GameLineup, Player, Turn } from '@prisma/client';
 import useSWR from 'swr';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 type LineupWithPlayer = GameLineup & { player: Player };
 type TurnWithEvents = Turn & {
@@ -40,6 +41,7 @@ export function LiveConsole({
     fallbackData: initialData,
     refreshInterval: 5000
   });
+  const router = useRouter();
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [adjustCount, setAdjustCount] = useState(1);
   const [adjustTarget, setAdjustTarget] = useState<
@@ -93,6 +95,14 @@ export function LiveConsole({
     return map;
   }, [latestTurn?.events]);
 
+  const isFinal = data?.state?.status === 'FINAL';
+
+  useEffect(() => {
+    if (isFinal && isScorer) {
+      router.replace('/');
+    }
+  }, [isFinal, isScorer, router]);
+
   const postEvent = async (body: Record<string, any>) => {
     setLoadingAction(true);
     const res = await fetch(`/api/games/${gameId}/events`, {
@@ -144,6 +154,10 @@ export function LiveConsole({
     mutate();
   };
 
+  if (isFinal) {
+    return null;
+  }
+
   return (
     <div className="space-y-4">
 
@@ -186,7 +200,7 @@ export function LiveConsole({
         <div className="rounded-full bg-gold-50 px-3 py-1 text-lg font-bold text-ink">{turnMakes}</div>
       </div>
 
-      {isScorer && (
+      {isScorer && !isFinal && (
         <>
           <div className="grid gap-3 md:grid-cols-3">
             <ShotButton label="Top Regular" onClick={() => handleShot(ResultType.TOP_REGULAR)} />
@@ -216,10 +230,10 @@ export function LiveConsole({
                       setAdjustCount(1);
                       setEndConfirm(false);
                     }}
-                    className="rounded-xl border border-rose-200 bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-400"
-                  >
-                    Pull home cup
-                  </button>
+                  className="rounded-xl border border-rose-200 bg-rose-300 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
+                >
+                  Pull home cup
+                </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -227,10 +241,10 @@ export function LiveConsole({
                       setAdjustCount(1);
                       setEndConfirm(false);
                     }}
-                    className="rounded-xl border border-rose-200 bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-400"
-                  >
-                    Pull away cup
-                  </button>
+                  className="rounded-xl border border-rose-200 bg-rose-300 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
+                >
+                  Pull away cup
+                </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -238,10 +252,10 @@ export function LiveConsole({
                       setAdjustCount(1);
                       setEndConfirm(false);
                     }}
-                    className="rounded-xl border border-gold-200 bg-gold-100 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-200"
-                  >
-                    Add home cup
-                  </button>
+                  className="rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-100"
+                >
+                  Add home cup
+                </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -249,22 +263,22 @@ export function LiveConsole({
                       setAdjustCount(1);
                       setEndConfirm(false);
                     }}
-                    className="rounded-xl border border-gold-200 bg-gold-100 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-200"
-                  >
-                    Add away cup
-                  </button>
-                </div>
-                <button
+                  className="rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-100"
+                >
+                  Add away cup
+                </button>
+              </div>
+              <button
                   type="button"
                   onClick={() => {
                     setEndConfirm(true);
                     setAdjustTarget(null);
                   }}
-                  className="w-full rounded-xl border border-rose-300 bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-500"
-                >
-                  End game
-                </button>
-              </div>
+                className="w-full rounded-xl border border-rose-300 bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-500"
+              >
+                End game
+              </button>
+            </div>
             )}
 
             {adjustTarget && (

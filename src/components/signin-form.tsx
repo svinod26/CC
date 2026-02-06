@@ -21,7 +21,7 @@ export function SignInForm() {
     if (res?.error) {
       setError('Invalid email or password');
     } else {
-      window.location.href = '/dashboard';
+      window.location.href = '/';
     }
   };
 

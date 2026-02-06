@@ -54,24 +54,7 @@ export async function PlayerDashboard({
   const player = await prisma.player.findUnique({ where: { id: playerId } });
   if (!player) return notFound();
 
-  const [shotEvents, legacyStats, games, leagueGames] = await Promise.all([
-    prisma.shotEvent.findMany({
-      where: {
-        shooterId: player.id,
-        resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
-        ...(seasonId ? { game: { seasonId } } : {}),
-        ...(gameType ? { game: { type: gameType } } : {})
-      },
-      include: { shooter: true },
-      orderBy: { timestamp: 'desc' }
-    }),
-    prisma.legacyPlayerStat.findMany({
-      where: {
-        playerId: player.id,
-        ...(seasonId ? { game: { seasonId } } : {}),
-        ...(gameType ? { game: { type: gameType } } : {})
-      }
-    }),
+  const [games, leagueGames] = await Promise.all([
     prisma.game.findMany({
       where: {
         ...(seasonId ? { seasonId } : {}),
@@ -106,9 +89,12 @@ export async function PlayerDashboard({
     })
   ]);
 
-  const playerBox = boxScore(shotEvents).get(player.id);
-  const tempoStats = advancedStats(shotEvents, defaultMultipliers).get(player.id);
-  const baseStats = baseRatingStats(shotEvents, defaultMultipliers).get(player.id);
+  const trackedEvents = games.flatMap((game) => game.events);
+  const legacyStats = games.flatMap((game) => game.legacyStats);
+
+  const playerBox = boxScore(trackedEvents).get(player.id);
+  const tempoStats = advancedStats(trackedEvents, defaultMultipliers).get(player.id);
+  const baseStats = baseRatingStats(trackedEvents, defaultMultipliers).get(player.id);
   const trackedAttempts = playerBox?.attempts ?? 0;
   const trackedMakes = playerBox?.makes ?? 0;
   const legacyTotals = legacyStats.reduce(
@@ -140,7 +126,7 @@ export async function PlayerDashboard({
   const ratingPerShot = attempts ? baseRating / attempts : 0;
   const tempoRating = tempoStats?.weightedPoints ?? 0;
   const tempoPerShot = trackedAttempts ? tempoRating / trackedAttempts : 0;
-  const clutchMakes = shotEvents.filter(
+  const clutchMakes = trackedEvents.filter(
     (event) => isMake(event.resultType) && (event.remainingCupsBefore ?? 100) <= 20
   ).length;
   const clutchShare = trackedMakes ? clutchMakes / trackedMakes : 0;

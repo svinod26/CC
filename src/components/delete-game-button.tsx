@@ -8,7 +8,7 @@ export function DeleteGameButton({ gameId }: { gameId: string }) {
   const [loading, setLoading] = useState(false);
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this in-progress game? This cannot be undone.')) return;
+    if (!window.confirm('Delete this game? This cannot be undone.')) return;
     setLoading(true);
     const res = await fetch(`/api/games/${gameId}`, { method: 'DELETE' });
     setLoading(false);

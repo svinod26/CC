@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerAuthSession } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { ResultType } from '@prisma/client';
 import { isMake, isShot } from '@/lib/stats';
@@ -8,6 +9,9 @@ import { resolveSeasonSelection } from '@/lib/season';
 
 export default async function HomePage() {
   const session = await getServerAuthSession();
+  if (!session) {
+    redirect('/signin');
+  }
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
   const { season: currentSeason } = resolveSeasonSelection(seasons);
 

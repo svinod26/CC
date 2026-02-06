@@ -7,6 +7,7 @@ import { getServerAuthSession } from '@/lib/auth';
 import { LiveBoxScores } from '@/components/live-box-scores';
 import { LivePlayByPlay } from '@/components/live-play-by-play';
 import { DeleteGameButton } from '@/components/delete-game-button';
+import { LiveScorebug } from '@/components/live-scorebug';
 
 export default async function GamePage({ params }: { params: { id: string } }) {
   const session = await getServerAuthSession();
@@ -133,7 +134,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
   const showConsole = game.status === 'IN_PROGRESS' && !isLegacy;
   const isScorer = Boolean(session?.user?.id && session.user.id === game.statTakerId);
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = session?.user?.role === 'ADMIN';
 
   return (
     <div className="space-y-6">
@@ -156,20 +157,37 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <TeamScoreCard
-              label={game.homeTeam?.name ?? 'Home'}
-              made={homeMade}
-              remaining={homeRemaining}
-              pulled={pulledHome}
-              result={homeWon ? 'W' : awayWon ? 'L' : ''}
-            />
-            <TeamScoreCard
-              label={game.awayTeam?.name ?? 'Away'}
-              made={awayMade}
-              remaining={awayRemaining}
-              pulled={pulledAway}
-              result={awayWon ? 'W' : homeWon ? 'L' : ''}
-            />
+            {isLegacy ? (
+              <>
+                <TeamScoreCard
+                  label={game.homeTeam?.name ?? 'Home'}
+                  made={homeMade}
+                  remaining={homeRemaining}
+                  pulled={pulledHome}
+                  result={homeWon ? 'W' : awayWon ? 'L' : ''}
+                />
+                <TeamScoreCard
+                  label={game.awayTeam?.name ?? 'Away'}
+                  made={awayMade}
+                  remaining={awayRemaining}
+                  pulled={pulledAway}
+                  result={awayWon ? 'W' : homeWon ? 'L' : ''}
+                />
+              </>
+            ) : (
+              <LiveScorebug
+                gameId={game.id}
+                initialData={{
+                  id: game.id,
+                  statsSource: game.statsSource,
+                  homeTeam: game.homeTeam,
+                  awayTeam: game.awayTeam,
+                  state: game.state,
+                  events: game.events,
+                  legacyTeamStats: game.legacyTeamStats
+                }}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -328,12 +346,14 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         </div>
       </section>
 
-      {isAdmin && game.status === 'IN_PROGRESS' && (
+      {isAdmin && (
         <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-rose-700">Admin controls</h2>
-              <p className="text-xs text-rose-600">Delete this in-progress game to reset the scorer.</p>
+              <p className="text-xs text-rose-600">
+                Delete this game to remove it from the season history.
+              </p>
             </div>
             <DeleteGameButton gameId={game.id} />
           </div>
@@ -367,9 +387,6 @@ function TeamScoreCard({
     <div className={`min-w-[160px] rounded-xl border px-4 py-3 ${resultStyles}`}>
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">{label}</p>
-        {result && (
-          <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold">{result}</span>
-        )}
       </div>
       <div className="mt-2 text-xs uppercase text-ash">Cups made</div>
       <div className="text-2xl font-bold text-ink">{made}</div>

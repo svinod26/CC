@@ -1,34 +1,34 @@
 import { prisma } from '@/lib/prisma';
 import { GameSetupForm } from '@/components/game-setup-form';
+import { resolveSeasonSelection } from '@/lib/season';
 
 export const metadata = {
   title: 'Start game | Century Cup'
 };
 
 export default async function NewGamePage() {
-  const [teams, seasons, players] = await Promise.all([
-    prisma.team.findMany({
-      include: {
-        rosters: {
-          include: { player: true }
-        }
-      },
-      orderBy: { name: 'asc' }
-    }),
-    prisma.season.findMany({ orderBy: { createdAt: 'desc' } }),
+  const [seasons, players] = await Promise.all([
+    prisma.season.findMany({ orderBy: { year: 'desc' } }),
     prisma.player.findMany({ orderBy: { name: 'asc' } })
   ]);
+
+  const { season: matchingSeason } = resolveSeasonSelection(seasons);
+
+  const teams = matchingSeason
+    ? await prisma.team.findMany({
+        where: { seasonId: matchingSeason.id },
+        include: {
+          rosters: {
+            include: { player: true }
+          }
+        },
+        orderBy: { name: 'asc' }
+      })
+    : [];
 
   const now = new Date();
   const year = now.getFullYear();
   const isFall = now.getMonth() >= 6;
-  const seasonName = isFall ? 'Fall' : 'Spring';
-  const matchingSeason =
-    seasons.find(
-      (season) =>
-        (season.year ?? year) === year &&
-        season.name.toLowerCase().includes(seasonName.toLowerCase())
-    ) ?? seasons[0];
 
   const mondayOnOrAfter = (date: Date) => {
     const result = new Date(date);

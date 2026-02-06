@@ -24,6 +24,17 @@ Visit `http://localhost:3000`.
 - A default admin is seeded from `.env` (`DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD`).
 - Admins can import Excel and manage seasons; users can start/exhibit games and log stats.
 
+## Email access (Resend)
+This app can email temporary passwords based on `Name_email_mapping.xlsx`.
+
+1. Create a Resend account and verify a sending domain (see Resend docs).
+2. Add these to `.env`:
+   - `RESEND_API_KEY`
+   - `RESEND_FROM` (ex: `Century Cup <noreply@mail.yourdomain.com>`)
+3. Users go to `/signin` → “Email me a password.”
+
+Passwords are generated on request and emailed in plaintext (per your preference).
+
 ## Excel import
 - Default path: `./S2026 CC Master Sheet.xlsx` in repo root.
 - Admin UI: `Dashboard → Import Excel` (`/admin/import`)
@@ -61,7 +72,7 @@ Notes:
 
 ## Live console (mobile-first)
 - Big buttons for `Top Regular`, `Top ISO`, `Bottom Regular`, `Bottom ISO`, `Miss`, plus Undo.
-- Pull cups for home/away racks.
+- Options menu for pull/add cups and end game.
 - Turn logic: 6-shot turns; 2+ makes triggers a bonus turn (same offense). Otherwise possession flips.
 - Auto-finalization handles redemption (defense shoots until miss; if they clear, overtime placeholder).
 

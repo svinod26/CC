@@ -12,6 +12,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       scheduleEntry: true,
       events: { orderBy: { timestamp: 'asc' }, include: { shooter: true } },
       legacyStats: { include: { player: true } },
+      legacyTeamStats: true,
       turns: {
         orderBy: { turnIndex: 'desc' },
         take: 1,
