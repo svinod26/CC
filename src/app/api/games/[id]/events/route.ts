@@ -85,7 +85,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         turnIndex: 1,
         isBonus: false,
         shootersJson: offenseLineup.map((l) => l.playerId)
-      }
+      },
+      include: { events: true }
     });
   }
 
@@ -206,7 +207,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           if (stuffMakesThisTurn >= 2) {
             newStatus = GameStatus.FINAL;
           } else {
-            const redemptionTeamId = nextHome === 0 ? game.homeTeamId : game.awayTeamId;
+            const redemptionTeamId =
+              (nextHome === 0 ? game.homeTeamId : game.awayTeamId) ?? offenseTeamId;
             await tx.turn.create({
               data: {
                 gameId,

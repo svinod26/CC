@@ -4,6 +4,7 @@ import { GameState, GameType, ResultType, Team, GameLineup, Player, Turn } from 
 import useSWR from 'swr';
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { isMake } from '@/lib/stats';
 
 type LineupWithPlayer = GameLineup & { player: Player };
 type TurnWithEvents = Turn & {
@@ -78,12 +79,7 @@ export function LiveConsole({
   const activeShooter =
     shooters.length > 0 ? shooters[currentShooterIndex % shooters.length]?.player : undefined;
 
-  const turnMakes =
-    latestTurn?.events?.filter((event) =>
-      [ResultType.TOP_REGULAR, ResultType.TOP_ISO, ResultType.BOTTOM_REGULAR, ResultType.BOTTOM_ISO].includes(
-        event.resultType
-      )
-    ).length ?? 0;
+  const turnMakes = latestTurn?.events?.filter((event) => isMake(event.resultType)).length ?? 0;
 
   const lastResultByShooter = useMemo(() => {
     const map = new Map<string, ResultType>();
@@ -167,13 +163,9 @@ export function LiveConsole({
           {shooters.map((slot, idx) => {
             const current = currentShooterIndex % Math.max(shooters.length, 1) === idx;
             const lastResult = lastResultByShooter.get(slot.player.id);
-            const isMake = lastResult
-              ? [ResultType.TOP_REGULAR, ResultType.TOP_ISO, ResultType.BOTTOM_REGULAR, ResultType.BOTTOM_ISO].includes(
-                  lastResult
-                )
-              : false;
+            const made = lastResult ? isMake(lastResult) : false;
             const isMiss = lastResult === ResultType.MISS;
-            const statusClass = isMake
+            const statusClass = made
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : isMiss
                 ? 'border-rose-200 bg-rose-50 text-rose-600'

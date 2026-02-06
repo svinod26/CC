@@ -57,11 +57,17 @@ export async function POST(req: Request) {
   }
 
   for (const player of parsedWorkbook.players) {
-    const createdPlayer = await prisma.player.upsert({
-      where: { email: player.email || `${player.name.replace(/\s+/g, '.')}@placeholder.cc` },
-      update: { name: player.name, email: player.email || null },
-      create: { name: player.name, email: player.email || null }
-    });
+    const lookup = player.email
+      ? await prisma.player.findFirst({ where: { email: player.email } })
+      : await prisma.player.findFirst({ where: { name: player.name } });
+    const createdPlayer = lookup
+      ? await prisma.player.update({
+          where: { id: lookup.id },
+          data: { name: player.name, email: player.email || lookup.email || null }
+        })
+      : await prisma.player.create({
+          data: { name: player.name, email: player.email || null }
+        });
 
     const teamId = player.team ? teamMap.get(player.team) : undefined;
     if (teamId) {

@@ -12,7 +12,7 @@ const signupSchema = z.object({
   role: z.enum(['ADMIN', 'USER']).optional()
 });
 
-export async function registerUser(prevState: { error?: string } | undefined, formData: FormData) {
+export async function registerUser(prevState: { error: string }, formData: FormData) {
   const data = Object.fromEntries(formData.entries());
   const parsed = signupSchema.safeParse({
     email: data.email,

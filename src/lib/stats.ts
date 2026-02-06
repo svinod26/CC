@@ -18,7 +18,7 @@ export const defaultMultipliers: Multipliers = {
   p: 2
 };
 
-const makeTypes = [
+const makeTypes: ResultType[] = [
   ResultType.TOP_REGULAR,
   ResultType.TOP_ISO,
   ResultType.BOTTOM_REGULAR,
@@ -47,10 +47,17 @@ export function winnerFromRemaining(
   return awayRemaining < homeRemaining ? 'home' : 'away';
 }
 
-export function boxScore(events: (ShotEvent & { shooter?: { id: string; name: string | null } | null })[]) {
+type ShotLike = {
+  resultType: ResultType;
+  shooterId?: string | null;
+  shooter?: { id: string; name: string | null } | null;
+};
+
+export function boxScore(events: ShotLike[]) {
   const byPlayer = new Map<
     string,
     {
+      id: string;
       name: string;
       makes: number;
       attempts: number;
@@ -67,6 +74,7 @@ export function boxScore(events: (ShotEvent & { shooter?: { id: string; name: st
     const pid = event.shooterId ?? event.shooter?.id ?? 'unknown';
     const name = event.shooter?.name ?? 'Unknown';
     const current = byPlayer.get(pid) ?? {
+      id: pid,
       name,
       makes: 0,
       attempts: 0,

@@ -50,19 +50,14 @@ export async function POST(req: Request) {
         }
 
         const [homeTeam, awayTeam] = await Promise.all([
-          tx.team.upsert({
-            where: { seasonId_name: { seasonId: null, name: homeName } },
-            update: {},
-            create: { name: homeName }
-          }),
-          tx.team.upsert({
-            where: { seasonId_name: { seasonId: null, name: awayName } },
-            update: {},
-            create: { name: awayName }
-          })
+          tx.team.findFirst({ where: { seasonId: null, name: homeName } }),
+          tx.team.findFirst({ where: { seasonId: null, name: awayName } })
         ]);
-        homeTeamId = homeTeam.id;
-        awayTeamId = awayTeam.id;
+
+        const createdHome = homeTeam ?? (await tx.team.create({ data: { name: homeName } }));
+        const createdAway = awayTeam ?? (await tx.team.create({ data: { name: awayName } }));
+        homeTeamId = createdHome.id;
+        awayTeamId = createdAway.id;
       }
 
       if (!homeTeamId || !awayTeamId) {

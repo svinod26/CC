@@ -221,10 +221,12 @@ export default async function HomePage() {
               >
                 <div>
                   {(() => {
-                    const homeWon =
-                      game.state && game.state.homeCupsRemaining < game.state.awayCupsRemaining;
-                    const awayWon =
-                      game.state && game.state.awayCupsRemaining < game.state.homeCupsRemaining;
+                    const homeWon = !!(
+                      game.state && game.state.homeCupsRemaining < game.state.awayCupsRemaining
+                    );
+                    const awayWon = !!(
+                      game.state && game.state.awayCupsRemaining < game.state.homeCupsRemaining
+                    );
                     const pillClass = (won: boolean, lost: boolean) =>
                       won
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'

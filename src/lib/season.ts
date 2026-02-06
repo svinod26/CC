@@ -1,7 +1,7 @@
 export type SeasonLike = {
   id: string;
   name: string;
-  year: number;
+  year: number | null;
 };
 
 const seasonRank = (name: string) => {
