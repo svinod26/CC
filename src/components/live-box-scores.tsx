@@ -108,33 +108,23 @@ export function LiveBoxScores({
     .filter((slot) => slot.teamId === data.awayTeam?.id)
     .sort((a, b) => a.orderIndex - b.orderIndex);
 
-  const orderRows = (lineup: LineupSlot[], teamId: string | null) => {
-    const rows: BoxRow[] = [];
+  const orderRows = (lineup: LineupSlot[]) => {
     const box = isLegacy ? legacyBox : trackedBox;
-    lineup.forEach((slot) => {
-      const row = box.get(slot.player.id) ?? blankRow(slot.player.id, slot.player.name ?? 'Unknown');
-      rows.push(row);
-    });
-    if (teamId) {
-      Array.from(box.values()).forEach((row) => {
-        if (rows.find((r) => r.id === row.id)) return;
-        const legacyRow = data.legacyStats.find((stat) => stat.playerId === row.id);
-        if (legacyRow && legacyRow.teamId && legacyRow.teamId !== teamId) return;
-        rows.push(row);
-      });
+    if (lineup.length === 0) {
+      return Array.from(box.values());
     }
-    return rows;
+    return lineup.map((slot) => box.get(slot.player.id) ?? blankRow(slot.player.id, slot.player.name ?? 'Unknown'));
   };
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <TeamTable
         title={`${data.homeTeam?.name ?? 'Home'} box score`}
-        rows={orderRows(homeLineup, data.homeTeam?.id ?? null)}
+        rows={orderRows(homeLineup)}
       />
       <TeamTable
         title={`${data.awayTeam?.name ?? 'Away'} box score`}
-        rows={orderRows(awayLineup, data.awayTeam?.id ?? null)}
+        rows={orderRows(awayLineup)}
       />
     </div>
   );

@@ -9,13 +9,14 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const game = await prisma.game.findUnique({ where: { id: params.id } });
+  const game = await prisma.game.findUnique({ where: { id: params.id }, include: { statTaker: true } });
   if (!game) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  const isAdmin = session.user.role === 'ADMIN';
-  const isScorer = game.statTakerId && session.user.id === game.statTakerId;
-  if (!isAdmin && !isScorer) {
+  const isScorer =
+    (game.statTakerId && session.user.id === game.statTakerId) ||
+    (game.statTaker?.email && session.user.email && game.statTaker.email === session.user.email);
+  if (!isScorer) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

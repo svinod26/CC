@@ -24,6 +24,8 @@ type PlayerAgg = {
   bottomIsos: number;
   misses: number;
   weightedPoints: number;
+  playerRating: number;
+  ratingPerShot: number;
   clutchMakes: number;
   weekMakes: number[];
 };
@@ -94,6 +96,8 @@ export default async function PlayerHubPage({
         bottomIsos: 0,
         misses: 0,
         weightedPoints: 0,
+        playerRating: 0,
+        ratingPerShot: 0,
         clutchMakes: 0,
         weekMakes: new Array(weekCount).fill(0)
       };
@@ -147,6 +151,8 @@ export default async function PlayerHubPage({
         bottomIsos: 0,
         misses: 0,
         weightedPoints: 0,
+        playerRating: 0,
+        ratingPerShot: 0,
         clutchMakes: 0,
         weekMakes: new Array(weekCount).fill(0)
       };
@@ -177,6 +183,27 @@ export default async function PlayerHubPage({
   }
 
   const list = Array.from(players.values());
+  const avgAdjusted =
+    list.length > 0
+      ? list
+          .filter((row) => row.attempts > 0)
+          .reduce((sum, row) => sum + row.weightedPoints, 0) /
+        Math.max(1, list.filter((row) => row.attempts > 0).length)
+      : 0;
+  const avgFg =
+    list.length > 0
+      ? list
+          .filter((row) => row.attempts > 0)
+          .reduce((sum, row) => sum + row.makes / row.attempts, 0) /
+        Math.max(1, list.filter((row) => row.attempts > 0).length)
+      : 0;
+  list.forEach((row) => {
+    const fg = row.attempts ? row.makes / row.attempts : 0;
+    const rating =
+      row.attempts > 0 && avgAdjusted > 0 && avgFg > 0 ? row.weightedPoints * fg * avgAdjusted * avgFg : 0;
+    row.playerRating = rating;
+    row.ratingPerShot = row.attempts > 0 ? rating / row.attempts : 0;
+  });
   const topBy = (key: keyof PlayerAgg, n = 20) =>
     [...list].sort((a, b) => Number(b[key]) - Number(a[key])).slice(0, n);
   const topFG = [...list]
@@ -185,7 +212,7 @@ export default async function PlayerHubPage({
     .slice(0, 20);
   const topPPS = [...list]
     .filter((p) => p.attempts >= 15)
-    .sort((a, b) => b.weightedPoints / b.attempts - a.weightedPoints / a.attempts)
+    .sort((a, b) => b.ratingPerShot - a.ratingPerShot)
     .slice(0, 20);
   const topIso = [...list]
     .sort((a, b) => b.topIsos + b.bottomIsos - (a.topIsos + a.bottomIsos))
@@ -229,32 +256,31 @@ export default async function PlayerHubPage({
     },
     {
       title: 'Top rating per shot',
-      subtitle: 'Player rating per shot (legacy uses base weights).',
+      subtitle: 'Player rating per shot (Adjusted FGM × FG% scaled by league averages).',
       rows: topPPS,
-      valueFor: (row: PlayerAgg) =>
-        Number(((row.weightedPoints / (row.attempts || 1)) || 0).toFixed(2)),
+      valueFor: (row: PlayerAgg) => Number((row.ratingPerShot || 0).toFixed(2)),
       suffix: ''
     }
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-garnet-600">Player hub</p>
-          <h1 className="text-3xl font-bold text-ink">League analytics</h1>
-          <p className="text-sm text-ash">
+          <p className="text-xs uppercase tracking-wide text-garnet-600">Player hub</p>
+          <h1 className="text-xl font-bold text-ink sm:text-3xl">League analytics</h1>
+          <p className="hidden text-[11px] text-ash sm:block sm:text-sm">
             Compare players, spot trends, and dig into advanced stats across the entire league.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <SeasonSelect seasons={orderedSeasons} value={seasonValue} />
-          <GameTypeSelect value={typeValue} />
+        <div className="flex flex-wrap items-start gap-2">
+          <SeasonSelect seasons={orderedSeasons} value={seasonValue} showLabel={false} />
+          <GameTypeSelect value={typeValue} showLabel={false} />
         </div>
       </div>
       <PlayerSearch players={list.map((player) => ({ id: player.id, name: player.name }))} />
 
-      <section className="grid items-start gap-4 lg:grid-cols-2">
+      <section className="grid items-start gap-3 lg:grid-cols-2">
         {sections.map((section) => (
           <CollapsibleCard key={section.title} title={section.title} subtitle={section.subtitle}>
             <div className="space-y-2">
@@ -305,15 +331,15 @@ function CollapsibleCard({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group self-start rounded-2xl border border-garnet-100 bg-white/85 shadow">
-      <summary className="flex cursor-pointer items-center justify-between px-5 py-4 text-ink">
+    <details className="group w-full self-start overflow-hidden rounded-2xl border border-garnet-100 bg-white/85 shadow">
+      <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-ink sm:px-5 sm:py-4">
         <div>
-          <h2 className="text-lg font-semibold text-ink">{title}</h2>
-          {subtitle && <p className="text-xs text-ash">{subtitle}</p>}
+          <h2 className="text-base font-semibold text-ink sm:text-lg">{title}</h2>
+          {subtitle && <p className="text-[11px] text-ash sm:text-xs">{subtitle}</p>}
         </div>
         <span className="text-xs font-semibold text-garnet-600 transition group-open:rotate-180">▾</span>
       </summary>
-      <div className="border-t border-garnet-100 px-5 pb-5 pt-4">{children}</div>
+      <div className="border-t border-garnet-100 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">{children}</div>
     </details>
   );
 }
@@ -335,20 +361,20 @@ function BarRow({
 }) {
   const percent = max ? Math.min((value / max) * 100, 100) : 0;
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-garnet-100 bg-parchment/70 px-3 py-2 text-sm">
-      <div className="w-36 truncate font-semibold text-ink">
-        <PlayerLink id={id} name={label} className="text-ink hover:text-garnet-600" />
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-garnet-100 bg-parchment/70 px-3 py-2 text-xs sm:text-sm">
+      <div className="min-w-0 flex-[1.2] truncate font-semibold text-ink">
+        <PlayerLink id={id} name={label} className="block truncate text-ink hover:text-garnet-600" />
       </div>
-      <div className="flex-1">
+      <div className="min-w-[90px] flex-1 sm:min-w-[120px]">
         <div className="h-2 w-full overflow-hidden rounded-full bg-gold-100">
           <div className="h-full bg-garnet-500" style={{ width: `${percent}%` }} />
         </div>
       </div>
-      <div className="w-16 text-right text-garnet-600">
+      <div className="w-12 text-right text-garnet-600 sm:w-16">
         {value}
         {suffix ?? ''}
       </div>
-      {children}
+      <div className="hidden sm:block">{children}</div>
     </div>
   );
 }

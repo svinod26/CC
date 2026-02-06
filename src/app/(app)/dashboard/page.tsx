@@ -16,7 +16,7 @@ export default async function DashboardPage({
 
   if (!email) {
     return (
-      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-6 text-ink shadow">
+      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 text-ink shadow sm:p-6">
         <h1 className="text-2xl font-bold text-ink">My dashboard</h1>
         <p className="mt-2 text-ash">Sign in to see your stats and personal history.</p>
       </div>
@@ -27,7 +27,7 @@ export default async function DashboardPage({
 
   if (!player) {
     return (
-      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-6 text-ink shadow">
+      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 text-ink shadow sm:p-6">
         <h1 className="text-2xl font-bold text-ink">My dashboard</h1>
         <p className="mt-2 text-ash">
           We couldn’t match your email to a player record. Ask an admin to link your email in the roster import.

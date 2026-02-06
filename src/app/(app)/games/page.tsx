@@ -31,28 +31,28 @@ export default async function GamesPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-garnet-600">Games</p>
-          <h1 className="text-2xl font-bold text-ink">Game history</h1>
-          <p className="text-sm text-ash">
+          <p className="text-xs uppercase tracking-wide text-garnet-600">Games</p>
+          <h1 className="text-lg font-bold text-ink sm:text-2xl">Game history</h1>
+          <p className="hidden text-[11px] text-ash sm:block sm:text-sm">
             {season ? `Viewing ${season.name}` : 'Viewing all seasons'} · {typeFilter ?? 'All types'}
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <SeasonSelect seasons={orderedSeasons} value={seasonValue} />
-          <GameTypeSelect value={typeValue} />
+        <div className="flex flex-wrap items-start gap-2">
+          <SeasonSelect seasons={orderedSeasons} value={seasonValue} showLabel={false} />
+          <GameTypeSelect value={typeValue} showLabel={false} />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-garnet-100 bg-white/80">
-        <table className="min-w-full text-sm text-ink">
+      <div className="overflow-x-auto rounded-2xl border border-garnet-100 bg-white/80">
+        <table className="min-w-[640px] text-sm text-ink">
           <thead className="bg-gold-50 text-ash">
             <tr>
-              <th className="px-3 py-2 text-left">Matchup</th>
-              <th className="px-3 py-2 text-left">Week</th>
-              <th className="px-3 py-2 text-left">Date</th>
-              <th className="px-3 py-2 text-left">Remaining</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Matchup</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Week</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Remaining</th>
             </tr>
           </thead>
           <tbody>

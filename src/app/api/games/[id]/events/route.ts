@@ -46,19 +46,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       lineups: true,
       turns: { orderBy: { turnIndex: 'desc' }, take: 1, include: { events: true } },
       homeTeam: true,
-      awayTeam: true
+      awayTeam: true,
+      statTaker: true
     }
   });
 
   if (!game || !game.state) {
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
   }
-  const isAdmin = session.user.role === 'ADMIN';
-  const isScorer = game.statTakerId && session.user.id === game.statTakerId;
-  if (!isAdmin && !isScorer) {
+  const isScorer =
+    (game.statTakerId && session.user.id === game.statTakerId) ||
+    (game.statTaker?.email && session.user.email && game.statTaker.email === session.user.email);
+  if (!isScorer) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  if (game.status === GameStatus.FINAL && !isAdmin) {
+  if (game.status === GameStatus.FINAL) {
     return NextResponse.json({ error: 'Game is finalized' }, { status: 403 });
   }
 

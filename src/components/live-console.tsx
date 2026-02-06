@@ -27,7 +27,14 @@ type GameStatePayload = {
   turns: TurnWithEvents[];
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error('Failed to load game state');
+  }
+  return res.json();
+};
 
 export function LiveConsole({
   gameId,
@@ -38,7 +45,7 @@ export function LiveConsole({
   initialData: GameStatePayload;
   isScorer: boolean;
 }) {
-  const { data, mutate } = useSWR<GameStatePayload>(`/api/games/${gameId}/state`, fetcher, {
+  const { data, mutate } = useSWR<GameStatePayload | null>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: initialData,
     refreshInterval: 5000
   });
@@ -99,6 +106,12 @@ export function LiveConsole({
     }
   }, [isFinal, isScorer, router]);
 
+  useEffect(() => {
+    if (data === null) {
+      router.replace('/');
+    }
+  }, [data, router]);
+
   const postEvent = async (body: Record<string, any>) => {
     setLoadingAction(true);
     const res = await fetch(`/api/games/${gameId}/events`, {
@@ -150,15 +163,15 @@ export function LiveConsole({
     mutate();
   };
 
-  if (isFinal) {
+  if (data === null || isFinal) {
     return null;
   }
 
   return (
     <div className="space-y-4">
 
-      <div className="rounded-2xl border border-garnet-100 bg-white/80 p-4">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="rounded-2xl border border-garnet-100 bg-white/80 p-3 sm:p-4">
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
           {shooters.length === 0 && <span className="text-xs text-ash">No lineup loaded.</span>}
           {shooters.map((slot, idx) => {
             const current = currentShooterIndex % Math.max(shooters.length, 1) === idx;
@@ -173,7 +186,7 @@ export function LiveConsole({
             return (
               <div
                 key={slot.id}
-                className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${statusClass} ${
+                className={`w-full truncate rounded-full border px-2 py-1 text-[10px] font-semibold transition sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${statusClass} ${
                   current ? 'ring-2 ring-gold-200' : ''
                 }`}
               >

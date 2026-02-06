@@ -11,10 +11,22 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const game = await prisma.game.findUnique({
     where: { id: params.id },
-    include: { state: true, homeTeam: true, awayTeam: true, turns: { orderBy: { turnIndex: 'desc' }, take: 1 } }
+    include: {
+      state: true,
+      homeTeam: true,
+      awayTeam: true,
+      turns: { orderBy: { turnIndex: 'desc' }, take: 1 },
+      statTaker: true
+    }
   });
   if (!game || !game.state || !game.homeTeamId || !game.awayTeamId) {
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+  }
+  const isScorer =
+    (game.statTakerId && session.user.id === game.statTakerId) ||
+    (game.statTaker?.email && session.user.email && game.statTaker.email === session.user.email);
+  if (!isScorer) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const nextOffense = game.state.possessionTeamId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;

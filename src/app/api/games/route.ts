@@ -4,6 +4,8 @@ import { GameStatus, GameType } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const schema = z.object({
   type: z.nativeEnum(GameType),
@@ -23,6 +25,30 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let userId = session.user.id;
+  let user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    const email = session.user.email ?? null;
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        const passwordHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+        user = await prisma.user.create({
+          data: {
+            email,
+            name: session.user.name ?? null,
+            passwordHash,
+            role: session.user.role === 'ADMIN' ? 'ADMIN' : 'USER'
+          }
+        });
+      }
+      userId = user.id;
+    }
+  }
+  if (!userId || !user) {
+    return NextResponse.json({ error: 'Account not found. Please sign out and sign in again.' }, { status: 401 });
   }
 
   const json = await req.json();
@@ -90,8 +116,8 @@ export async function POST(req: Request) {
           startedAt: scheduledDate ?? new Date(),
           scheduledAt: scheduledDate ?? undefined,
           status,
-          createdById: session.user!.id,
-          statTakerId: session.user!.id,
+          createdById: userId,
+          statTakerId: userId,
           state: {
             create: {
               possessionTeamId: homeTeamId,

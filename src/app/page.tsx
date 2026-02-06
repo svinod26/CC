@@ -17,7 +17,7 @@ export default async function HomePage() {
 
   if (!currentSeason) {
     return (
-      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-6 text-ink shadow">
+      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 text-ink shadow sm:p-6">
         <h1 className="text-2xl font-bold text-ink">Century Cup Hub</h1>
         <p className="mt-2 text-ash">No seasons found. Import a season to get started.</p>
       </div>
@@ -180,7 +180,7 @@ export default async function HomePage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {inProgress && (
         <Link
           href={`/games/${inProgress.id}`}
@@ -189,8 +189,8 @@ export default async function HomePage() {
           Live now: {inProgress.homeTeam?.name ?? 'Home'} vs {inProgress.awayTeam?.name ?? 'Away'} · Tap to watch
         </Link>
       )}
-      <section className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-6 shadow">
+      <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 shadow sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm uppercase tracking-wide text-garnet-600">League latest · {currentSeason.name}</p>
@@ -282,7 +282,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-garnet-100 bg-white/80 p-6 shadow">
+        <div className="rounded-2xl border border-garnet-100 bg-white/80 p-3 shadow sm:p-5">
           <p className="text-sm uppercase tracking-wide text-garnet-600">AI recap</p>
           <h2 className="mt-2 text-xl font-semibold text-ink">Weekly story (scaffold)</h2>
           <p className="mt-3 text-sm text-ash">
@@ -298,8 +298,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-6 shadow">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 shadow sm:p-5">
           <p className="text-sm uppercase tracking-wide text-garnet-600">Top performers</p>
           <h2 className="mt-2 text-xl font-semibold text-ink">
             {latestWeek ? `Week ${latestWeek} hot hands` : 'Recent hot hands'}
@@ -313,25 +313,27 @@ export default async function HomePage() {
                     : game.events.some((event) => event.shooterId === player.id)
                 )?.id ?? null;
               const content = (
-                <>
-                  <p className="font-semibold text-ink">{player.name}</p>
-                  <p className="text-garnet-600">
+                <div className="flex w-full flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="min-w-0 break-words font-semibold leading-tight text-ink sm:truncate">
+                    {player.name}
+                  </p>
+                  <p className="text-[11px] text-garnet-600 sm:text-sm sm:text-right">
                     {player.makes} cups · {(player.fg * 100).toFixed(1)}% FG · {player.tops} tops
                   </p>
-                </>
+                </div>
               );
               return gameId ? (
                 <Link
                   key={player.id ?? player.name}
                   href={`/games/${gameId}`}
-                  className="flex items-center justify-between rounded-xl border border-garnet-100 bg-parchment/70 px-4 py-3 text-sm transition hover:bg-gold-50/60"
+                  className="flex items-center rounded-xl border border-garnet-100 bg-parchment/70 px-3 py-2 text-sm transition hover:bg-gold-50/60 sm:px-4 sm:py-3"
                 >
                   {content}
                 </Link>
               ) : (
                 <div
                   key={player.id ?? player.name}
-                  className="flex items-center justify-between rounded-xl border border-garnet-100 bg-parchment/70 px-4 py-3 text-sm"
+                  className="flex items-center rounded-xl border border-garnet-100 bg-parchment/70 px-3 py-2 text-sm sm:px-4 sm:py-3"
                 >
                   {content}
                 </div>
@@ -341,7 +343,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-6 shadow">
+        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 shadow sm:p-5">
           <p className="text-sm uppercase tracking-wide text-garnet-600">Your latest</p>
           <h2 className="mt-2 text-xl font-semibold text-ink">Recent performances</h2>
           {!session && (

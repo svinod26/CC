@@ -32,6 +32,7 @@ type PlayerStat = {
   bottomRegular: number;
   bottomIsos: number;
   clutchMakes: number;
+  adjustedFgm: number;
   playerRating: number;
   tempoRating: number;
   weekMakes: number[];
@@ -72,6 +73,7 @@ const buildEmpty = (id: string, name: string, weekCount: number): PlayerStat => 
   bottomRegular: 0,
   bottomIsos: 0,
   clutchMakes: 0,
+  adjustedFgm: 0,
   playerRating: 0,
   tempoRating: 0,
   weekMakes: new Array(weekCount).fill(0)
@@ -147,6 +149,19 @@ export default async function PlayerComparePage({
       })
     : [];
 
+  const leagueEvents = await prisma.shotEvent.findMany({
+    where: {
+      shooterId: { not: null },
+      resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
+      ...(Object.keys(gameWhere).length ? { game: gameWhere } : {})
+    }
+  });
+  const leagueLegacyStats = await prisma.legacyPlayerStat.findMany({
+    where: {
+      ...(Object.keys(gameWhere).length ? { game: gameWhere } : {})
+    }
+  });
+
   const stats = new Map<string, PlayerStat>();
   for (const id of selectedIds) {
     const player = players.find((p) => p.id === id);
@@ -172,7 +187,7 @@ export default async function PlayerComparePage({
       if (event.resultType === 'BOTTOM_ISO') current.bottomIsos += 1;
 
       const remaining = event.remainingCupsBefore ?? 100;
-      current.playerRating += baseWeightFor(event.resultType);
+      current.adjustedFgm += baseWeightFor(event.resultType);
       current.tempoRating += tempoWeightFor(remaining, event.resultType);
       if (remaining <= 20) current.clutchMakes += 1;
 
@@ -196,7 +211,7 @@ export default async function PlayerComparePage({
     current.topIsos += stat.topIso;
     current.bottomRegular += stat.bottomRegular;
     current.bottomIsos += stat.bottomIso;
-    current.playerRating +=
+    current.adjustedFgm +=
       stat.topRegular * defaultMultipliers.top +
       stat.topIso * defaultMultipliers.topIso +
       stat.bottomRegular * defaultMultipliers.bottom +
@@ -206,7 +221,50 @@ export default async function PlayerComparePage({
     stats.set(stat.playerId, current);
   }
 
+  const leagueAgg = new Map<string, { adjusted: number; makes: number; attempts: number }>();
+  for (const event of leagueEvents) {
+    if (!event.shooterId) continue;
+    const current = leagueAgg.get(event.shooterId) ?? { adjusted: 0, makes: 0, attempts: 0 };
+    current.attempts += 1;
+    if (isMake(event.resultType as any)) {
+      current.makes += 1;
+      current.adjusted += baseWeightFor(event.resultType);
+    }
+    leagueAgg.set(event.shooterId, current);
+  }
+  for (const stat of leagueLegacyStats) {
+    if (!stat.playerId) continue;
+    const current = leagueAgg.get(stat.playerId) ?? { adjusted: 0, makes: 0, attempts: 0 };
+    const breakdown = stat.topRegular + stat.topIso + stat.bottomRegular + stat.bottomIso;
+    const makes = stat.totalCups > 0 ? stat.totalCups : breakdown;
+    const attempts = makes + stat.misses;
+    current.makes += makes;
+    current.attempts += attempts;
+    current.adjusted +=
+      stat.topRegular * defaultMultipliers.top +
+      stat.topIso * defaultMultipliers.topIso +
+      stat.bottomRegular * defaultMultipliers.bottom +
+      stat.bottomIso * defaultMultipliers.bottomIso;
+    leagueAgg.set(stat.playerId, current);
+  }
+  const leagueValues = Array.from(leagueAgg.values()).filter((row) => row.attempts > 0);
+  const leagueAvgAdjusted =
+    leagueValues.length > 0
+      ? leagueValues.reduce((sum, row) => sum + row.adjusted, 0) / leagueValues.length
+      : 0;
+  const leagueAvgFg =
+    leagueValues.length > 0
+      ? leagueValues.reduce((sum, row) => sum + row.makes / row.attempts, 0) / leagueValues.length
+      : 0;
+
   const selected = selectedIds.map((id) => stats.get(id)).filter((row): row is PlayerStat => Boolean(row));
+  selected.forEach((row) => {
+    const fg = row.attempts ? row.makes / row.attempts : 0;
+    row.playerRating =
+      row.attempts > 0 && leagueAvgAdjusted > 0 && leagueAvgFg > 0
+        ? row.adjustedFgm * fg * leagueAvgAdjusted * leagueAvgFg
+        : 0;
+  });
   const comparePair = selected.length === 2 ? ([selected[0], selected[1]] as const) : null;
 
   const compareLabel =
@@ -217,25 +275,31 @@ export default async function PlayerComparePage({
         : 'Overall season';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-garnet-600">Player comparison</p>
-          <h1 className="text-3xl font-bold text-ink">Head-to-head insights</h1>
-          <p className="text-sm text-ash">Choose players and a time window to compare styles, volume, and efficiency.</p>
+          <p className="text-xs uppercase tracking-wide text-garnet-600">Player comparison</p>
+          <h1 className="text-xl font-bold text-ink sm:text-3xl">Head-to-head insights</h1>
+          <p className="hidden text-[11px] text-ash sm:block sm:text-sm">
+            Choose players and a time window to compare styles, volume, and efficiency.
+          </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <SeasonSelect seasons={orderedSeasons} value={seasonValue} />
-          <GameTypeSelect value={typeValue} />
+        <div className="flex flex-wrap items-start gap-2">
+          <SeasonSelect seasons={orderedSeasons} value={seasonValue} showLabel={false} />
+          <GameTypeSelect value={typeValue} showLabel={false} />
         </div>
       </div>
 
-      <form className="grid gap-4 rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow md:grid-cols-4" method="get">
+      <form className="grid gap-4 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5 md:grid-cols-4" method="get">
         <input type="hidden" name="season" value={seasonValue} />
         <input type="hidden" name="type" value={typeValue} />
-        <label className="text-xs font-semibold uppercase tracking-wide text-ash">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-ash sm:text-xs">
           Player A
-          <select name="a" className="mt-2 w-full" defaultValue={searchParams.a ?? ''}>
+          <select
+            name="a"
+            className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
+            defaultValue={searchParams.a ?? ''}
+          >
             <option value="">Select player</option>
             {players.map((player) => (
               <option key={player.id} value={player.id}>
@@ -244,9 +308,13 @@ export default async function PlayerComparePage({
             ))}
           </select>
         </label>
-        <label className="text-xs font-semibold uppercase tracking-wide text-ash">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-ash sm:text-xs">
           Player B
-          <select name="b" className="mt-2 w-full" defaultValue={searchParams.b ?? ''}>
+          <select
+            name="b"
+            className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
+            defaultValue={searchParams.b ?? ''}
+          >
             <option value="">Select player</option>
             {players.map((player) => (
               <option key={player.id} value={player.id}>
@@ -255,17 +323,25 @@ export default async function PlayerComparePage({
             ))}
           </select>
         </label>
-        <label className="text-xs font-semibold uppercase tracking-wide text-ash">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-ash sm:text-xs">
           Mode
-          <select name="mode" className="mt-2 w-full" defaultValue={searchParams.mode ?? 'overall'}>
+          <select
+            name="mode"
+            className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
+            defaultValue={searchParams.mode ?? 'overall'}
+          >
             <option value="overall">Overall season</option>
             <option value="latest">Latest week</option>
             <option value="week">Pick a week</option>
           </select>
         </label>
-        <label className="text-xs font-semibold uppercase tracking-wide text-ash">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-ash sm:text-xs">
           Week
-          <select name="week" className="mt-2 w-full" defaultValue={searchParams.week ?? ''}>
+          <select
+            name="week"
+            className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
+            defaultValue={searchParams.week ?? ''}
+          >
             <option value="">—</option>
             {Array.from({ length: weekCount }, (_, idx) => idx + 1).map((week) => (
               <option key={week} value={week}>
@@ -275,7 +351,7 @@ export default async function PlayerComparePage({
           </select>
         </label>
         <div className="md:col-span-4">
-          <button className="rounded-full bg-garnet-600 px-5 py-3 text-sm font-semibold text-sand shadow hover:bg-garnet-500">
+          <button className="rounded-full bg-garnet-600 px-4 py-2.5 text-sm font-semibold text-sand shadow hover:bg-garnet-500 sm:px-5 sm:py-3">
             Compare players
           </button>
         </div>
@@ -283,8 +359,8 @@ export default async function PlayerComparePage({
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-ink">Comparison snapshot</h2>
-          <span className="text-xs uppercase tracking-wide text-garnet-600">
+          <h2 className="text-lg font-semibold text-ink sm:text-xl">Comparison snapshot</h2>
+          <span className="text-[11px] uppercase tracking-wide text-garnet-600 sm:text-xs">
             {compareLabel} · {season ? season.name : 'All seasons'}
           </span>
         </div>
@@ -295,10 +371,14 @@ export default async function PlayerComparePage({
               const totalMakes = row.topRegular + row.topIsos + row.bottomRegular + row.bottomIsos;
               const fg = row.attempts ? (totalMakes / row.attempts) * 100 : 0;
               return (
-              <div key={row.id} className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+              <div key={row.id} className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <PlayerLink id={row.id} name={row.name} className="text-lg font-semibold text-ink hover:text-garnet-600" />
+                    <PlayerLink
+                      id={row.id}
+                      name={row.name}
+                      className="text-base font-semibold text-ink hover:text-garnet-600 sm:text-lg"
+                    />
                     <p className="text-xs text-ash">{compareLabel}</p>
                   </div>
                   <Sparkline data={row.weekMakes} />
@@ -306,8 +386,12 @@ export default async function PlayerComparePage({
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <StatTile label="Total cups" value={totalMakes} />
                   <StatTile label="FG%" value={row.attempts ? fg.toFixed(1) : '0'} />
-                  <StatTile label="Player rating" value={row.playerRating.toFixed(2)} />
-                  <StatTile label="Rating / shot" value={row.attempts ? (row.playerRating / row.attempts).toFixed(2) : '—'} />
+                  <StatTile label="Adjusted FGM" value={row.adjustedFgm.toFixed(2)} />
+                  <StatTile label="Player rating" value={row.playerRating ? row.playerRating.toFixed(2) : '—'} />
+                  <StatTile
+                    label="Rating / shot"
+                    value={row.attempts ? (row.playerRating / row.attempts).toFixed(2) : '—'}
+                  />
                   <StatTile label="Tempo rating (tracked)" value={row.trackedAttempts ? row.tempoRating.toFixed(2) : '—'} />
                   <StatTile label="Tempo / shot (tracked)" value={row.trackedAttempts ? (row.tempoRating / row.trackedAttempts).toFixed(2) : '—'} />
                 </div>
@@ -327,13 +411,13 @@ export default async function PlayerComparePage({
       </section>
 
       {comparePair && (
-        <section className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+        <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-ink">Visual matchup</h2>
-              <p className="text-xs text-ash">Side-by-side bars for volume, efficiency, and rating.</p>
+              <h2 className="text-base font-semibold text-ink sm:text-lg">Visual matchup</h2>
+              <p className="text-[11px] text-ash sm:text-xs">Side-by-side bars for volume, efficiency, and rating.</p>
             </div>
-            <span className="text-xs uppercase tracking-wide text-garnet-600">{compareLabel}</span>
+            <span className="text-[11px] uppercase tracking-wide text-garnet-600 sm:text-xs">{compareLabel}</span>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-3 rounded-xl border border-garnet-100 bg-parchment/60 p-4">

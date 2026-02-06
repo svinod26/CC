@@ -26,7 +26,7 @@ type TeamAgg = {
   bottomIsos: number;
   clutchMakes: number;
   pulledCups: number;
-  weekMakes: number[];
+  weekNet: number[];
 };
 
 const maxFrom = (rows: TeamAgg[], valueFor: (row: TeamAgg) => number) => {
@@ -103,7 +103,7 @@ export default async function TeamsPage({
       bottomIsos: 0,
       clutchMakes: 0,
       pulledCups: 0,
-      weekMakes: new Array(weekCount).fill(0)
+      weekNet: new Array(weekCount).fill(0)
     });
   });
 
@@ -119,6 +119,11 @@ export default async function TeamsPage({
     const margin = awayRemaining - homeRemaining;
     home.margin += margin;
     away.margin -= margin;
+    const week = game.scheduleEntry?.week;
+    if (week && week >= 1 && week <= weekCount) {
+      home.weekNet[week - 1] += margin;
+      away.weekNet[week - 1] -= margin;
+    }
     const winner = winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource);
     if (winner === 'home') {
       home.wins += 1;
@@ -149,7 +154,9 @@ export default async function TeamsPage({
       if ((event.remainingCupsBefore ?? 100) <= 20) current.clutchMakes += 1;
 
       const week = event.game?.scheduleEntry?.week;
-      if (week && week >= 1 && week <= weekCount) current.weekMakes[week - 1] += 1;
+      if (week && week >= 1 && week <= weekCount) {
+        // weekly trend handled by net margin from game results
+      }
     }
 
     teamStats.set(event.offenseTeamId, current);
@@ -188,7 +195,9 @@ export default async function TeamsPage({
     current.bottomIsos += stat.bottomIso;
 
     const week = stat.game?.scheduleEntry?.week;
-    if (week && week >= 1 && week <= weekCount) current.weekMakes[week - 1] += makes;
+    if (week && week >= 1 && week <= weekCount) {
+      // weekly trend handled by net margin from game results
+    }
 
     teamStats.set(stat.teamId, current);
   }
@@ -207,17 +216,19 @@ export default async function TeamsPage({
   const topClutch = topBy('clutchMakes');
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-garnet-600">Team hub</p>
-          <h1 className="text-2xl font-bold text-ink">League squads</h1>
-          <p className="text-sm text-ash">Roster depth, team form, and where each squad is thriving.</p>
+          <p className="text-xs uppercase tracking-wide text-garnet-600">Team hub</p>
+          <h1 className="text-lg font-bold text-ink sm:text-2xl">League squads</h1>
+          <p className="hidden text-[11px] text-ash sm:block sm:text-sm">
+            Roster depth, team form, and where each squad is thriving.
+          </p>
         </div>
-        <SeasonSelect seasons={orderedSeasons} value={seasonValue} allowAll={false} />
+        <SeasonSelect seasons={orderedSeasons} value={seasonValue} allowAll={false} showLabel={false} />
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-3 md:grid-cols-2">
         {teams.map((team) => {
           const stats = teamStats.get(team.id);
           const fg = stats?.attempts ? ((stats.makes / stats.attempts) * 100).toFixed(1) : '0.0';
@@ -234,7 +245,7 @@ export default async function TeamsPage({
               fg={fg}
               clutch={stats?.clutchMakes ?? 0}
               pulled={stats?.pulledCups ?? 0}
-              weekly={stats?.weekMakes ?? []}
+              weekly={stats?.weekNet ?? []}
               roster={team.rosters.map((r) => ({ id: r.player.id, name: r.player.name }))}
             />
           );
@@ -242,8 +253,8 @@ export default async function TeamsPage({
         {teams.length === 0 && <p className="text-sm text-ash">No teams yet. Import from Excel.</p>}
       </section>
 
-      <section className="grid items-start gap-4 lg:grid-cols-2">
-        <CollapsibleCard title="Top margin" subtitle="Total margin across finalized games.">
+      <section className="grid items-start gap-3 lg:grid-cols-2">
+        <CollapsibleCard title="Best margin" subtitle="Net margin across finalized games.">
           {topMargin.length === 0 && <p className="text-sm text-ash">No data yet.</p>}
           {topMargin.map((row) => (
             <BarRow
@@ -269,7 +280,7 @@ export default async function TeamsPage({
         </CollapsibleCard>
       </section>
 
-      <section className="grid items-start gap-4 lg:grid-cols-2">
+      <section className="grid items-start gap-3 lg:grid-cols-2">
         <CollapsibleCard title="Top ISO volume" subtitle="ISO makes (top + bottom).">
           {topIso.length === 0 && <p className="text-sm text-ash">No data yet.</p>}
           {topIso.map((row) => (
@@ -307,15 +318,15 @@ function CollapsibleCard({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group self-start rounded-2xl border border-garnet-100 bg-white/85 shadow">
-      <summary className="flex cursor-pointer items-center justify-between px-5 py-4 text-ink">
+    <details className="group w-full self-start overflow-hidden rounded-2xl border border-garnet-100 bg-white/85 shadow">
+      <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-ink sm:px-5 sm:py-4">
         <div>
-          <h2 className="text-lg font-semibold text-ink">{title}</h2>
-          {subtitle && <p className="text-xs text-ash">{subtitle}</p>}
+          <h2 className="text-base font-semibold text-ink sm:text-lg">{title}</h2>
+          {subtitle && <p className="text-[11px] text-ash sm:text-xs">{subtitle}</p>}
         </div>
         <span className="text-xs font-semibold text-garnet-600 transition group-open:rotate-180">▾</span>
       </summary>
-      <div className="space-y-2 border-t border-garnet-100 px-5 pb-5 pt-4">{children}</div>
+      <div className="space-y-2 border-t border-garnet-100 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">{children}</div>
     </details>
   );
 }
@@ -335,14 +346,14 @@ function BarRow({
 }) {
   const percent = max ? Math.min((Math.abs(value) / max) * 100, 100) : 0;
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-garnet-100 bg-parchment/70 px-3 py-2 text-sm">
-      <div className="w-36 truncate font-semibold text-ink">{label}</div>
-      <div className="flex-1">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-garnet-100 bg-parchment/70 px-3 py-2 text-xs sm:text-sm">
+      <div className="min-w-0 flex-[1.2] truncate font-semibold text-ink">{label}</div>
+      <div className="min-w-[90px] flex-1 sm:min-w-[120px]">
         <div className="h-2 w-full overflow-hidden rounded-full bg-gold-100">
           <div className="h-full bg-garnet-500" style={{ width: `${percent}%` }} />
         </div>
       </div>
-      <div className="w-16 text-right text-garnet-600">
+      <div className="w-12 text-right text-garnet-600 sm:w-16">
         {signed && value > 0 ? '+' : ''}
         {value}
         {suffix ?? ''}

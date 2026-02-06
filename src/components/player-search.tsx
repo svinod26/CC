@@ -13,11 +13,11 @@ export function PlayerSearch({ players }: { players: { id: string; name: string 
   }, [players, query, minChars]);
 
   return (
-    <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow">
-      <label className="text-xs font-semibold uppercase tracking-wide text-ash">
+    <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 shadow sm:p-4">
+      <label className="text-[10px] font-semibold uppercase tracking-wide text-ash sm:text-xs">
         Jump to player
         <input
-          className="mt-2 w-full"
+          className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
           placeholder="Type a name (e.g., Somil)"
           value={query}
           onChange={(event) => setQuery(event.target.value)}

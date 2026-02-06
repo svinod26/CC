@@ -18,6 +18,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
       awayTeam: true,
       state: true,
       scheduleEntry: true,
+      statTaker: true,
       lineups: { include: { player: true } },
       turns: {
         orderBy: { turnIndex: 'asc' },
@@ -133,23 +134,27 @@ export default async function GamePage({ params }: { params: { id: string } }) {
   const startedLabel = game.startedAt ? new Date(game.startedAt).toLocaleDateString() : '';
 
   const showConsole = game.status === 'IN_PROGRESS' && !isLegacy;
-  const isScorer = Boolean(session?.user?.id && session.user.id === game.statTakerId);
+  const isScorer = Boolean(
+    (session?.user?.id && session.user.id === game.statTakerId) ||
+      (session?.user?.email && game.statTaker?.email && session.user.email === game.statTaker.email)
+  );
+  const canScore = isScorer;
   const isAdmin = session?.user?.role === 'ADMIN';
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-6 shadow">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-5 sm:space-y-6">
+      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm uppercase tracking-wide text-garnet-600">{weekLabel}</p>
+              <p className="text-xs uppercase tracking-wide text-garnet-600">{weekLabel}</p>
               {isLegacy && (
                 <span className="rounded-full border border-gold-300 bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-garnet-600">
                   Legacy stats
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-ink">
+            <h1 className="text-xl font-bold text-ink sm:text-2xl">
               {game.homeTeam?.name ?? 'Home'} vs {game.awayTeam?.name ?? 'Away'}
             </h1>
             <p className="text-xs text-ash">
@@ -194,25 +199,25 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
       {showConsole && (
         <div>
-          <LiveConsole gameId={game.id} initialData={initialData as any} isScorer={isScorer} />
+          <LiveConsole gameId={game.id} initialData={initialData as any} isScorer={canScore} />
         </div>
       )}
 
       {isLegacy && (
-        <section className="rounded-2xl border border-garnet-100 bg-parchment/70 p-5 text-sm text-ash">
+        <section className="rounded-2xl border border-garnet-100 bg-parchment/70 p-4 text-sm text-ash sm:p-5">
           Legacy game: shot order and play-by-play were not recorded in the old system. Box scores below reflect final totals only.
         </section>
       )}
 
       <LiveBoxScores gameId={game.id} initialData={game as any} />
 
-      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <div className="flex items-center justify-between">
           <div>
-          <h2 className="text-lg font-semibold text-ink">MVP</h2>
-          <p className="text-xs text-ash">
-            {tempoRows.length > 0 ? 'Tempo rating (temporal scaling) if tracked.' : 'Player rating (base weights).'}
-          </p>
+            <h2 className="text-base font-semibold text-ink sm:text-lg">MVP</h2>
+            <p className="text-[11px] text-ash sm:text-xs">
+              {tempoRows.length > 0 ? 'Tempo rating (temporal scaling) if tracked.' : 'Adjusted FGM (base weights).'}
+            </p>
           </div>
           <span className="rounded-full border border-gold-300 bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-garnet-600">
             {isLegacy ? 'Legacy' : 'Tracked'}
@@ -223,18 +228,18 @@ export default async function GamePage({ params }: { params: { id: string } }) {
           <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_2fr]">
             <div className="rounded-xl border border-garnet-100 bg-parchment/70 p-4">
               <p className="text-xs uppercase tracking-wide text-ash">Game MVP</p>
-              <p className="mt-1 text-lg font-semibold text-ink">
+              <p className="mt-1 text-base font-semibold text-ink sm:text-lg">
                 <PlayerLink id={mvp.id} name={mvp.name} className="text-ink hover:text-garnet-600" />
               </p>
               <p className="mt-2 text-sm text-garnet-600">
-                {mvp.weightedPoints.toFixed(2)} rating · {mvp.makes} cups ·{' '}
+                {mvp.weightedPoints.toFixed(2)} adjusted FGM · {mvp.makes} cups ·{' '}
                 {mvp.attempts ? ((mvp.makes / mvp.attempts) * 100).toFixed(1) : '0'}% FG
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {ratingLeaders.map((row, idx) => (
                 <div key={row.id} className="rounded-xl border border-garnet-100 bg-white/80 p-4">
-                  <p className="text-xs uppercase tracking-wide text-ash">#{idx + 1} rating</p>
+                  <p className="text-xs uppercase tracking-wide text-ash">#{idx + 1} adjusted FGM</p>
                   <p className="mt-1 font-semibold text-ink">
                     <PlayerLink id={row.id} name={row.name} className="text-ink hover:text-garnet-600" />
                   </p>
@@ -247,25 +252,25 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             </div>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-ash">No rating data yet.</p>
+          <p className="mt-4 text-sm text-ash">No adjusted FGM data yet.</p>
         )}
       </section>
 
       {!isLegacy && (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-garnet-100 bg-white/80 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">Advanced</h2>
-              <p className="text-xs text-ash">
-                player rating uses base weights; tempo rating applies temporal scaling.
+            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-base font-semibold text-ink sm:text-lg">Advanced</h2>
+              <p className="max-w-full text-[11px] text-ash sm:max-w-[260px] sm:text-xs sm:text-right">
+                Adjusted FGM uses base weights; tempo rating applies temporal scaling.
               </p>
             </div>
             <div className="mt-3 overflow-auto">
-              <table className="min-w-full text-sm text-ink">
-                <thead className="text-ash">
+              <table className="min-w-[420px] text-xs text-ink sm:min-w-full sm:text-sm">
+                <thead className="text-[11px] text-ash sm:text-xs">
                   <tr>
                     <th className="px-2 py-1 text-left">Player</th>
-                    <th className="px-2 py-1 text-center">Player rating</th>
+                    <th className="px-2 py-1 text-center">Adjusted FGM</th>
                     <th className="px-2 py-1 text-center">Rating / shot</th>
                     <th className="px-2 py-1 text-center">Tempo rating</th>
                   </tr>
@@ -305,7 +310,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
           <div className="rounded-xl border border-garnet-100 bg-white/80 p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">Play-by-play</h2>
+              <h2 className="text-base font-semibold text-ink sm:text-lg">Play-by-play</h2>
               <p className="text-xs text-ash">Tap undo in console to remove last event</p>
             </div>
             <div className="mt-3">
@@ -315,8 +320,8 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
-        <h2 className="text-lg font-semibold text-ink">Game flow</h2>
+      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
+        <h2 className="text-base font-semibold text-ink sm:text-lg">Game flow</h2>
         <div className="mt-3 max-h-96 space-y-3 overflow-y-auto pr-2 text-sm text-ink">
           {game.turns.length === 0 && <p className="text-ash">No events logged.</p>}
           {game.turns.map((turn) => (
@@ -347,7 +352,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
       </section>
 
       {isAdmin && (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5">
+        <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-rose-700">Admin controls</h2>

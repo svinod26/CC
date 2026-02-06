@@ -48,6 +48,9 @@ export function GameSetupForm({
     return map;
   }, [players]);
 
+  const inputClass = 'w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm';
+  const selectClass = `${inputClass} appearance-none pr-10`;
+
   useEffect(() => {
     setHomeLineup(Array.from({ length: 6 }, () => ''));
     setAwayLineup(Array.from({ length: 6 }, () => ''));
@@ -143,14 +146,14 @@ export function GameSetupForm({
   const awayPlayers = rosterOptions.away ?? [];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-garnet-100 bg-white/90 p-5 shadow">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-garnet-100 bg-white/90 p-4 shadow sm:space-y-5 sm:p-5">
       {error && <div className="rounded-xl bg-garnet-50 px-3 py-2 text-sm text-garnet-700">{error}</div>}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1 text-sm">
           <span className="text-ink">Game type</span>
           <div className="relative">
             <select
-              className="w-full appearance-none pr-10"
+              className={selectClass}
               value={gameType}
               onChange={(e) => setGameType(e.target.value as GameType)}
             >
@@ -167,7 +170,7 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Home team</span>
             <div className="relative">
-              <select className="w-full appearance-none pr-10" value={homeTeamId} onChange={(e) => setHomeTeamId(e.target.value)}>
+              <select className={selectClass} value={homeTeamId} onChange={(e) => setHomeTeamId(e.target.value)}>
                 <option value="">Select team</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -181,7 +184,7 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Away team</span>
             <div className="relative">
-              <select className="w-full appearance-none pr-10" value={awayTeamId} onChange={(e) => setAwayTeamId(e.target.value)}>
+              <select className={selectClass} value={awayTeamId} onChange={(e) => setAwayTeamId(e.target.value)}>
                 <option value="">Select team</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -200,7 +203,7 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Home team name</span>
             <input
-              className="w-full"
+              className={inputClass}
               value={homeTeamName}
               onChange={(e) => setHomeTeamName(e.target.value)}
               placeholder="Home team"
@@ -209,7 +212,7 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Away team name</span>
             <input
-              className="w-full"
+              className={inputClass}
               value={awayTeamName}
               onChange={(e) => setAwayTeamName(e.target.value)}
               placeholder="Away team"
@@ -223,7 +226,7 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Week</span>
             <div className="relative">
-              <select className="w-full appearance-none pr-10" value={week} onChange={(e) => setWeek(Number(e.target.value))}>
+              <select className={selectClass} value={week} onChange={(e) => setWeek(Number(e.target.value))}>
                 {Array.from({ length: maxWeek }, (_, idx) => idx + 1).map((wk) => (
                   <option key={wk} value={wk}>
                     Week {wk}
@@ -295,6 +298,8 @@ function OrderedLineup({
     next[index] = value;
     onChange(next);
   };
+  const selectClass =
+    'mt-1 w-full appearance-none rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 pr-10 text-sm text-ink shadow-sm';
 
   return (
     <div className="rounded-2xl border border-garnet-100 bg-white/70 p-4">
@@ -312,7 +317,7 @@ function OrderedLineup({
             Shooter {idx + 1}
             <div className="relative">
               <select
-                className="mt-1 w-full appearance-none pr-10"
+                className={selectClass}
                 value={value}
                 onChange={(e) => updateSlot(idx, e.target.value)}
               >
@@ -344,12 +349,16 @@ function SearchLineup({
   onChange: (values: string[]) => void;
   players: Player[];
 }) {
-  const listId = `${title.replace(/\s+/g, '-').toLowerCase()}-players`;
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const updateSlot = (index: number, value: string) => {
     const next = [...values];
     next[index] = value;
     onChange(next);
   };
+  const inputClass =
+    'mt-1 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm';
+
+  const normalizedSelected = values.map((value) => value.trim().toLowerCase());
 
   return (
     <div className="rounded-2xl border border-garnet-100 bg-white/70 p-4">
@@ -358,24 +367,52 @@ function SearchLineup({
         <p className="text-xs text-ash">Search any player</p>
       </div>
       <div className="mt-3 grid gap-3">
-        {values.map((value, idx) => (
-          <label key={`${title}-${idx}`} className="text-xs text-ash">
-            Shooter {idx + 1}
-            <input
-              className="mt-1 w-full"
-              list={listId}
-              value={value}
-              onChange={(e) => updateSlot(idx, e.target.value)}
-              placeholder="Start typing a name"
-            />
-          </label>
-        ))}
+        {values.map((value, idx) => {
+          const query = value.trim().toLowerCase();
+          const suggestions =
+            query.length === 0
+              ? []
+              : players
+                  .filter((player) => player.name.toLowerCase().includes(query))
+                  .filter((player) => {
+                    const normalized = player.name.toLowerCase();
+                    return normalized === normalizedSelected[idx] || !normalizedSelected.includes(normalized);
+                  })
+                  .slice(0, 6);
+          return (
+            <div key={`${title}-${idx}`} className="relative">
+              <label className="text-xs text-ash">
+                Shooter {idx + 1}
+                <input
+                  className={inputClass}
+                  value={value}
+                  onFocus={() => setOpenIndex(idx)}
+                  onBlur={() => setTimeout(() => setOpenIndex(null), 120)}
+                  onChange={(e) => updateSlot(idx, e.target.value)}
+                  placeholder="Start typing a name"
+                />
+              </label>
+              {openIndex === idx && suggestions.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-xl border border-garnet-100 bg-white p-1 shadow-lg">
+                  {suggestions.map((player) => (
+                    <button
+                      key={player.id}
+                      type="button"
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-gold-50"
+                      onClick={() => {
+                        updateSlot(idx, player.name);
+                        setOpenIndex(null);
+                      }}
+                    >
+                      {player.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <datalist id={listId}>
-        {players.map((player) => (
-          <option key={player.id} value={player.name} />
-        ))}
-      </datalist>
     </div>
   );
 }

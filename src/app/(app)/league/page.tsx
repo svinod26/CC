@@ -87,19 +87,21 @@ export default async function LeaguePage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-wide text-garnet-600">{seasonWithData.name}</p>
-          <h1 className="text-2xl font-bold text-ink">Standings</h1>
-          <p className="text-ash">Top 2 teams per conference advance to playoffs.</p>
+          <p className="text-xs uppercase tracking-wide text-garnet-600">{seasonWithData.name}</p>
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Standings</h1>
+          <p className="hidden text-[11px] text-ash sm:block sm:text-sm">
+            Top 2 teams per conference advance to playoffs.
+          </p>
         </div>
-        <SeasonSelect seasons={orderedSeasons} value={seasonValue} allowAll={false} />
+        <SeasonSelect seasons={orderedSeasons} value={seasonValue} allowAll={false} showLabel={false} />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         {Object.entries(byConference).map(([conf, rows]) => (
-          <div key={conf} className="rounded-xl border border-garnet-100 bg-white/80 p-4 shadow">
+          <div key={conf} className="rounded-xl border border-garnet-100 bg-white/80 p-3 shadow sm:p-4">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-lg font-semibold text-garnet-600">{conf}</p>
+              <p className="text-base font-semibold text-garnet-600 sm:text-lg">{conf}</p>
               <p className="text-xs uppercase text-ash">W-L</p>
             </div>
             <div className="space-y-2">

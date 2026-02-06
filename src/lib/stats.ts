@@ -12,8 +12,8 @@ export type Multipliers = {
 export const defaultMultipliers: Multipliers = {
   top: 1.1,
   bottom: 1.0,
-  topIso: 1.15,
-  bottomIso: 1.2,
+  topIso: 1.2,
+  bottomIso: 1.05,
   alpha: 0.5,
   p: 2
 };

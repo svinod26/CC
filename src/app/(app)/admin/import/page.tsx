@@ -20,7 +20,7 @@ export default async function ImportPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-garnet-100 bg-white/85 p-5 shadow">
+      <div className="rounded-3xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <p className="text-xs uppercase tracking-[0.2em] text-garnet-600">Data</p>
         <h1 className="mt-2 text-3xl font-bold text-ink">Import from Excel</h1>
         <p className="mt-2 text-sm text-ash">Use the local Century Cup workbook or upload another .xlsx.</p>

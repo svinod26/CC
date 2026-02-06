@@ -17,7 +17,7 @@ export function DeleteGameButton({ gameId }: { gameId: string }) {
       alert(body?.error ?? 'Failed to delete game.');
       return;
     }
-    router.push('/games');
+    router.push('/');
     router.refresh();
   };
 

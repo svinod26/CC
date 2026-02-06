@@ -5,7 +5,7 @@ export const metadata = {
 export default function InfoPage() {
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-garnet-100 bg-white/85 p-5 shadow">
+      <div className="rounded-3xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <p className="text-xs uppercase tracking-[0.2em] text-garnet-600">Info</p>
         <h1 className="mt-2 text-3xl font-bold text-ink">Formulas & definitions</h1>
         <p className="mt-2 text-sm text-ash">
@@ -14,12 +14,15 @@ export default function InfoPage() {
       </div>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
           <h2 className="text-lg font-semibold text-ink">Player ratings</h2>
           <ul className="mt-3 space-y-2 text-sm text-ash">
             <li>
-              <span className="font-semibold text-ink">Player rating</span>: sum of weighted makes.
-              Weights: top {`1.10`}, bottom {`1.00`}, top ISO {`1.15`}, bottom ISO {`1.20`}.
+              <span className="font-semibold text-ink">Adjusted FGM</span>: weighted makes.
+              Weights: top {`1.10`}, bottom {`1.00`}, top ISO {`1.20`}, bottom ISO {`1.05`}.
+            </li>
+            <li>
+              <span className="font-semibold text-ink">Player rating</span>: Adjusted FGM × FG% × league avg Adjusted FGM × league avg FG%.
             </li>
             <li>
               <span className="font-semibold text-ink">Rating / shot</span>: player rating ÷ total attempts.
@@ -35,7 +38,7 @@ export default function InfoPage() {
           </ul>
         </div>
 
-        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+        <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
           <h2 className="text-lg font-semibold text-ink">Box score</h2>
           <ul className="mt-3 space-y-2 text-sm text-ash">
             <li>
@@ -49,7 +52,7 @@ export default function InfoPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+      <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <h2 className="text-lg font-semibold text-ink">Team metrics</h2>
         <ul className="mt-3 space-y-2 text-sm text-ash">
           <li>
@@ -62,7 +65,7 @@ export default function InfoPage() {
         </ul>
       </section>
 
-      <section className="rounded-2xl border border-garnet-100 bg-parchment/70 p-5 text-sm text-ash">
+      <section className="rounded-2xl border border-garnet-100 bg-parchment/70 p-4 text-sm text-ash sm:p-5">
         Formula sources live in <span className="font-semibold text-ink">src/lib/stats.ts</span>.
       </section>
     </div>

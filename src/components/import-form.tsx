@@ -32,7 +32,7 @@ export function ImportForm() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow">
+    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       {message && <div className="rounded-xl bg-gold-50 px-3 py-2 text-sm text-garnet-700">{message}</div>}
       <label className="block space-y-1 text-sm text-ink">
         <span>Workbook path (optional)</span>

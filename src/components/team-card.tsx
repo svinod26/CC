@@ -40,7 +40,7 @@ export function TeamCard({
 
   return (
     <div
-      className="cursor-pointer rounded-2xl border border-garnet-100 bg-white/85 p-5 shadow transition hover:bg-gold-50/40"
+      className="cursor-pointer rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow transition hover:bg-gold-50/40 sm:p-5"
       role="button"
       tabIndex={0}
       onClick={onCardClick}
@@ -50,20 +50,20 @@ export function TeamCard({
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-lg font-semibold text-ink">{name}</p>
+          <p className="text-base font-semibold text-ink sm:text-lg">{name}</p>
           <p className="text-xs text-ash">
             {conference} · {season}
           </p>
         </div>
         <div className="text-right text-xs uppercase text-ash">
           Record
-          <div className="text-base font-semibold text-garnet-600">
+          <div className="text-sm font-semibold text-garnet-600 sm:text-base">
             {wins}-{losses}
           </div>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs sm:text-sm">
         <TeamStat label="Margin" value={margin} />
         <TeamStat label="FG%" value={fg} />
         <TeamStat label="Clutch (tracked)" value={clutch} />
@@ -71,7 +71,7 @@ export function TeamCard({
       <p className="mt-2 text-xs text-ash">Pulled cups: {pulled}</p>
 
       <div className="mt-3">
-        <p className="text-xs uppercase tracking-wide text-ash">Weekly trend</p>
+        <p className="text-xs uppercase tracking-wide text-ash">Weekly margin trend</p>
         <div className="mt-1">
           <Sparkline data={weekly} />
         </div>
@@ -93,9 +93,9 @@ export function TeamCard({
 
 function TeamStat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border border-garnet-100 bg-parchment/70 px-3 py-2 text-sm">
-      <p className="text-xs uppercase tracking-wide text-ash">{label}</p>
-      <p className="text-lg font-semibold text-garnet-600">{value}</p>
+    <div className="rounded-xl border border-garnet-100 bg-parchment/70 px-3 py-2 text-xs sm:text-sm">
+      <p className="text-[10px] uppercase tracking-wide text-ash sm:text-xs">{label}</p>
+      <p className="text-base font-semibold text-garnet-600 sm:text-lg">{value}</p>
     </div>
   );
 }
