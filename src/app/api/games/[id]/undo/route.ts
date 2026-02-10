@@ -102,7 +102,7 @@ async function recomputeState(gameId: string) {
   let currentShooterIndex = 0;
 
   for (const turn of turns) {
-    const offenseId = turn.offenseTeamId ?? game.homeTeamId;
+    const offenseId: string = turn.offenseTeamId ?? game.homeTeamId;
     const defenseId = offenseId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
     let shotsThisTurn = 0;
 
