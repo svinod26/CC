@@ -61,6 +61,7 @@ async function recomputeState(gameId: string) {
     include: {
       homeTeam: true,
       awayTeam: true,
+      state: true,
       lineups: true,
       turns: {
         orderBy: { turnIndex: 'asc' },
@@ -71,7 +72,13 @@ async function recomputeState(gameId: string) {
 
   if (!game || !game.homeTeamId || !game.awayTeamId) return;
 
-  let turns = game.turns;
+  let turns = game.turns.slice();
+
+  while (turns.length > 0 && turns[turns.length - 1].events.length === 0) {
+    await prisma.turn.delete({ where: { id: turns[turns.length - 1].id } });
+    turns.pop();
+  }
+
   if (turns.length === 0) {
     const offenseTeamId = game.homeTeamId;
     const created = await prisma.turn.create({
@@ -91,18 +98,13 @@ async function recomputeState(gameId: string) {
 
   let homeCups = 100;
   let awayCups = 100;
-  let possessionTeamId = game.homeTeamId;
   let currentTurnNumber = 1;
   let currentShooterIndex = 0;
-  let lastStatus: GameStatus = GameStatus.IN_PROGRESS;
 
   for (const turn of turns) {
-    const offenseId = turn.offenseTeamId ?? possessionTeamId;
+    const offenseId = turn.offenseTeamId ?? game.homeTeamId;
     const defenseId = offenseId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
-    const lineupLength =
-      game.lineups.filter((l) => l.teamId === offenseId).sort((a, b) => a.orderIndex - b.orderIndex).length || 6;
     let shotsThisTurn = 0;
-    let makesThisTurn = 0;
 
     for (const event of turn.events) {
       if (event.resultType === ResultType.PULL_HOME) {
@@ -117,7 +119,6 @@ async function recomputeState(gameId: string) {
           event.resultType === ResultType.BOTTOM_ISO;
         shotsThisTurn += 1;
         if (isMake) {
-          makesThisTurn += 1;
           if (offenseId === game.homeTeamId) {
             awayCups = Math.max(awayCups - 1, 0);
           } else {
@@ -128,17 +129,25 @@ async function recomputeState(gameId: string) {
     }
 
     currentTurnNumber = turn.turnIndex;
+    const shooterIds = Array.isArray(turn.shootersJson) ? (turn.shootersJson as string[]) : [];
+    const lineupLength =
+      shooterIds.length ||
+      game.lineups.filter((l) => l.teamId === offenseId).sort((a, b) => a.orderIndex - b.orderIndex).length ||
+      6;
     currentShooterIndex = shotsThisTurn % Math.max(lineupLength, 1);
-    if (shotsThisTurn >= Math.max(lineupLength, 1)) {
-      if (makesThisTurn < 2) {
-        possessionTeamId = defenseId;
-      }
-    }
   }
 
-  if (homeCups <= 0 || awayCups <= 0) {
-    lastStatus = GameStatus.FINAL;
-  }
+  const lastTurn = turns[turns.length - 1];
+  const possessionTeamId = lastTurn?.offenseTeamId ?? game.homeTeamId;
+  const zeroTeamId =
+    homeCups <= 0 ? game.homeTeamId : awayCups <= 0 ? game.awayTeamId : null;
+  const nextPhase =
+    game.state?.phase === 'OVERTIME'
+      ? 'OVERTIME'
+      : zeroTeamId && possessionTeamId === zeroTeamId
+        ? 'REDEMPTION'
+        : 'REGULATION';
+  const nextStatus = GameStatus.IN_PROGRESS;
 
   await prisma.gameState.updateMany({
     where: { gameId },
@@ -148,14 +157,16 @@ async function recomputeState(gameId: string) {
       possessionTeamId,
       currentTurnNumber,
       currentShooterIndex,
-      status: lastStatus
+      status: nextStatus,
+      phase: nextPhase as any
     }
   });
 
   await prisma.game.update({
     where: { id: gameId },
     data: {
-      status: lastStatus
+      status: nextStatus,
+      endedAt: null
     }
   });
 }
