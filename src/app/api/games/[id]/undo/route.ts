@@ -35,21 +35,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   await prisma.shotEvent.delete({ where: { id: lastEvent.id } });
 
-  // Clean empty trailing turns
-  const turns = await prisma.turn.findMany({
-    where: { gameId: params.id },
-    orderBy: { turnIndex: 'desc' },
-    include: { events: true }
-  });
-
-  for (const turn of turns) {
-    if (turn.events.length === 0) {
-      await prisma.turn.delete({ where: { id: turn.id } });
-    } else {
-      break;
-    }
-  }
-
   await recomputeState(params.id);
 
   return NextResponse.json({ ok: true });
@@ -74,8 +59,25 @@ async function recomputeState(gameId: string) {
 
   let turns = game.turns.slice();
 
-  while (turns.length > 0 && turns[turns.length - 1].events.length === 0) {
-    await prisma.turn.delete({ where: { id: turns[turns.length - 1].id } });
+  while (turns.length > 1 && turns[turns.length - 1].events.length === 0) {
+    const prevTurn = turns[turns.length - 2];
+    const prevOffenseId = prevTurn.offenseTeamId ?? game.homeTeamId;
+    const prevShooterIds = Array.isArray(prevTurn.shootersJson) ? (prevTurn.shootersJson as string[]) : [];
+    const prevLineupLength =
+      prevShooterIds.length ||
+      game.lineups.filter((l) => l.teamId === prevOffenseId).sort((a, b) => a.orderIndex - b.orderIndex).length ||
+      6;
+    const prevShots = prevTurn.events.filter(
+      (event) => event.resultType !== ResultType.PULL_HOME && event.resultType !== ResultType.PULL_AWAY
+    ).length;
+    const trailingTurnIsStillValid = prevShots >= Math.max(prevLineupLength, 1);
+
+    if (trailingTurnIsStillValid) {
+      break;
+    }
+
+    const trailingTurn = turns[turns.length - 1];
+    await prisma.turn.delete({ where: { id: trailingTurn.id } });
     turns.pop();
   }
 
@@ -103,7 +105,6 @@ async function recomputeState(gameId: string) {
 
   for (const turn of turns) {
     const offenseId: string = turn.offenseTeamId ?? game.homeTeamId;
-    const defenseId = offenseId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
     let shotsThisTurn = 0;
 
     for (const event of turn.events) {

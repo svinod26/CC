@@ -215,7 +215,7 @@ const applyEvent = async ({ gameId, shooterId, resultType, teamId, count }) => {
       } else if (shooterIndex >= turnLineupLength) {
         newStatus = GameStatus.FINAL;
       }
-    } else if (phase === GamePhase.REGULATION) {
+    } else {
       if (!isPull && shotsThisTurn >= turnLineupLength) {
         const nextTurnIndex = ensuredTurn.turnIndex + 1;
         if (clearedThisTurn) {
@@ -257,8 +257,14 @@ const applyEvent = async ({ gameId, shooterId, resultType, teamId, count }) => {
             }
           });
           currentTurnNumber = nextTurnIndex;
+          shooterIndex = 0;
+          nextLineupLength = Math.max(shooterIds.length || offenseLineup.length || 6, 1);
         } else {
           const nextOffense = defenseTeamId ?? offenseTeamId;
+          const nextOffenseLineupLength = Math.max(
+            game.lineups.filter((l) => l.teamId === nextOffense && l.isActive).length || 6,
+            1
+          );
           await tx.turn.create({
             data: {
               gameId,
@@ -273,6 +279,8 @@ const applyEvent = async ({ gameId, shooterId, resultType, teamId, count }) => {
           });
           possessionTeamId = nextOffense;
           currentTurnNumber = nextTurnIndex;
+          shooterIndex = 0;
+          nextLineupLength = nextOffenseLineupLength;
         }
       }
     }
@@ -308,19 +316,6 @@ const undoLastEvent = async (gameId) => {
   if (!lastEvent) return false;
   await prisma.shotEvent.delete({ where: { id: lastEvent.id } });
 
-  const turns = await prisma.turn.findMany({
-    where: { gameId },
-    orderBy: { turnIndex: 'desc' },
-    include: { events: true }
-  });
-  for (const turn of turns) {
-    if (turn.events.length === 0) {
-      await prisma.turn.delete({ where: { id: turn.id } });
-    } else {
-      break;
-    }
-  }
-
   await recomputeState(gameId);
   return true;
 };
@@ -343,8 +338,25 @@ const recomputeState = async (gameId) => {
   if (!game || !game.homeTeamId || !game.awayTeamId) return;
   let turns = game.turns.slice();
 
-  while (turns.length > 0 && turns[turns.length - 1].events.length === 0) {
-    await prisma.turn.delete({ where: { id: turns[turns.length - 1].id } });
+  while (turns.length > 1 && turns[turns.length - 1].events.length === 0) {
+    const prevTurn = turns[turns.length - 2];
+    const prevOffenseId = prevTurn.offenseTeamId ?? game.homeTeamId;
+    const prevShooterIds = Array.isArray(prevTurn.shootersJson) ? prevTurn.shootersJson : [];
+    const prevLineupLength =
+      prevShooterIds.length ||
+      game.lineups.filter((l) => l.teamId === prevOffenseId).sort((a, b) => a.orderIndex - b.orderIndex).length ||
+      6;
+    const prevShots = prevTurn.events.filter(
+      (event) => event.resultType !== ResultType.PULL_HOME && event.resultType !== ResultType.PULL_AWAY
+    ).length;
+    const trailingTurnIsStillValid = prevShots >= Math.max(prevLineupLength, 1);
+
+    if (trailingTurnIsStillValid) {
+      break;
+    }
+
+    const trailingTurn = turns[turns.length - 1];
+    await prisma.turn.delete({ where: { id: trailingTurn.id } });
     turns.pop();
   }
 
@@ -482,9 +494,43 @@ const runLeagueFlow = async (season, admin) => {
   assert(turns.length >= 3, 'Defense turn should be created after bonus');
   assert(turns[2].offenseTeamId === away.id, 'Possession should flip to away');
 
+  // Regression guard: undo first shot of a newly created turn should keep that turn active.
+  await applyEvent({
+    gameId: game.id,
+    shooterId: awayLineup[0].playerId,
+    resultType: ResultType.MISS,
+    teamId: away.id
+  });
+  let state = await prisma.gameState.findUnique({ where: { gameId: game.id } });
+  assert(state.currentTurnNumber === turns[2].turnIndex, 'State should remain on away turn after first away shot');
+  await undoLastEvent(game.id);
+  state = await prisma.gameState.findUnique({ where: { gameId: game.id } });
+  assert(state.currentTurnNumber === turns[2].turnIndex, 'Undo should preserve the active away turn');
+  assert(state.possessionTeamId === away.id, 'Undo should preserve away possession');
+
+  // Regression guard: undoing the last shot from a completed turn should drop the now-invalid empty next turn.
+  for (let i = 0; i < awayLineup.length; i += 1) {
+    await applyEvent({
+      gameId: game.id,
+      shooterId: awayLineup[i].playerId,
+      resultType: ResultType.MISS,
+      teamId: away.id
+    });
+  }
+  let postAwayTurns = await prisma.turn.findMany({ where: { gameId: game.id }, orderBy: { turnIndex: 'asc' } });
+  const homeTurnAfterAway = postAwayTurns[postAwayTurns.length - 1];
+  assert(homeTurnAfterAway.offenseTeamId === home.id, 'Home turn should be created after away finishes rack');
+  await undoLastEvent(game.id);
+  postAwayTurns = await prisma.turn.findMany({ where: { gameId: game.id }, orderBy: { turnIndex: 'asc' } });
+  assert(postAwayTurns[postAwayTurns.length - 1].offenseTeamId === away.id, 'Invalid empty next turn should be removed');
+  state = await prisma.gameState.findUnique({ where: { gameId: game.id } });
+  assert(state.currentTurnNumber === turns[2].turnIndex, 'Undo should return to away turn after removing last away shot');
+  assert(state.currentShooterIndex === awayLineup.length - 1, 'Shooter index should return to final away shooter slot');
+  assert(state.possessionTeamId === away.id, 'Possession should return to away after dropping empty next turn');
+
   // Pull/add cups + undo
   await applyEvent({ gameId: game.id, shooterId: null, resultType: ResultType.PULL_HOME, teamId: home.id, count: 2 });
-  let state = await prisma.gameState.findUnique({ where: { gameId: game.id } });
+  state = await prisma.gameState.findUnique({ where: { gameId: game.id } });
   assert(state.homeCupsRemaining === 98, 'Pull home should decrement');
 
   await applyEvent({ gameId: game.id, shooterId: null, resultType: ResultType.PULL_AWAY, teamId: home.id, count: -3 });

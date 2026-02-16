@@ -46,7 +46,7 @@ export default async function GamesPage({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-garnet-100 bg-white/80">
-        <table className="min-w-[640px] text-sm text-ink">
+        <table className="w-full min-w-[640px] text-sm text-ink">
           <thead className="bg-gold-50 text-ash">
             <tr>
               <th className="px-3 py-2 text-left whitespace-nowrap">Matchup</th>

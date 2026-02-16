@@ -202,7 +202,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       } else if (shooterIndex >= turnLineupLength) {
         newStatus = GameStatus.FINAL;
       }
-    } else if (phase === 'REGULATION') {
+    } else {
       if (!isPull && shotsThisTurn >= turnLineupLength) {
         const nextTurnIndex = ensuredTurn.turnIndex + 1;
         if (clearedThisTurn) {
@@ -255,8 +255,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             }
           });
           currentTurnNumber = nextTurnIndex;
+          shooterIndex = 0;
+          nextLineupLength = Math.max(shooterIds.length || offenseLineup.length || 6, 1);
         } else {
           const nextOffense = defenseTeamId ?? offenseTeamId;
+          const nextOffenseLineupLength = Math.max(
+            game.lineups.filter((l) => l.teamId === nextOffense && l.isActive).length || 6,
+            1
+          );
           await tx.turn.create({
             data: {
               gameId,
@@ -271,6 +277,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           });
           possessionTeamId = nextOffense;
           currentTurnNumber = nextTurnIndex;
+          shooterIndex = 0;
+          nextLineupLength = nextOffenseLineupLength;
         }
       }
     }
