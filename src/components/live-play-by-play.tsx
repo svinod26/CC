@@ -24,7 +24,7 @@ export function LivePlayByPlay({
 }) {
   const { data } = useSWR<{ events: PlayEvent[] }>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: { events: initialEvents },
-    refreshInterval: 5000
+    refreshInterval: 1200
   });
 
   const events = (data?.events ?? initialEvents).slice().sort((a, b) => {

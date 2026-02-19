@@ -36,6 +36,8 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
+const touchClass = 'touch-manipulation select-none active:scale-[0.98]';
+
 export function LiveConsole({
   gameId,
   initialData,
@@ -47,7 +49,8 @@ export function LiveConsole({
 }) {
   const { data, mutate } = useSWR<GameStatePayload | null>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: initialData,
-    refreshInterval: 5000
+    refreshInterval: isScorer ? 900 : 1200,
+    revalidateOnFocus: true
   });
   const router = useRouter();
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -57,19 +60,18 @@ export function LiveConsole({
   >(null);
   const [endConfirm, setEndConfirm] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const possessionTeamId = data?.state?.possessionTeamId;
   const offenseTeam = possessionTeamId
-    ? [data?.homeTeam, data?.awayTeam].find((t) => t?.id === possessionTeamId)
+    ? [data?.homeTeam, data?.awayTeam].find((team) => team?.id === possessionTeamId)
     : data?.homeTeam;
-  const defenseTeam =
-    offenseTeam?.id === data?.homeTeam?.id ? data?.awayTeam ?? null : data?.homeTeam ?? null;
   const phase = data?.state?.phase ?? 'REGULATION';
 
   const offenseLineup = useMemo(
     () =>
       (data?.lineups ?? [])
-        .filter((l) => l.teamId === offenseTeam?.id && l.isActive)
+        .filter((lineup) => lineup.teamId === offenseTeam?.id && lineup.isActive)
         .sort((a, b) => a.orderIndex - b.orderIndex),
     [data?.lineups, offenseTeam?.id]
   );
@@ -78,7 +80,7 @@ export function LiveConsole({
   const bonusShooters = (latestTurn?.shootersJson as string[] | null) ?? [];
   const bonusPlayers =
     bonusShooters.length > 0
-      ? offenseLineup.filter((p) => bonusShooters.includes(p.playerId))
+      ? offenseLineup.filter((slot) => bonusShooters.includes(slot.playerId))
       : offenseLineup;
 
   const shooters = bonusPlayers.length > 0 ? bonusPlayers : offenseLineup;
@@ -114,6 +116,7 @@ export function LiveConsole({
 
   const postEvent = async (body: Record<string, any>) => {
     setLoadingAction(true);
+    setActionError(null);
     const res = await fetch(`/api/games/${gameId}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -121,10 +124,11 @@ export function LiveConsole({
     });
     setLoadingAction(false);
     if (!res.ok) {
-      alert('Failed to record event');
+      const parsed = await res.json().catch(() => ({}));
+      setActionError(parsed?.error ?? 'Failed to record event');
       return;
     }
-    mutate();
+    await mutate();
   };
 
   const handleShot = async (resultType: ResultType) => {
@@ -143,24 +147,35 @@ export function LiveConsole({
 
   const handleFinalize = async () => {
     setLoadingAction(true);
+    setActionError(null);
     const res = await fetch(`/api/games/${gameId}/finalize`, { method: 'POST' });
     setLoadingAction(false);
     if (!res.ok) {
-      alert('Failed to end game');
+      const parsed = await res.json().catch(() => ({}));
+      setActionError(parsed?.error ?? 'Failed to end game');
       return;
     }
-    mutate();
+    await mutate();
   };
 
   const handleUndo = async () => {
     setLoadingAction(true);
+    setActionError(null);
     const res = await fetch(`/api/games/${gameId}/undo`, { method: 'POST' });
     setLoadingAction(false);
     if (!res.ok) {
-      alert('Nothing to undo');
+      const parsed = await res.json().catch(() => ({}));
+      setActionError(parsed?.error ?? 'Nothing to undo');
       return;
     }
-    mutate();
+    await mutate();
+  };
+
+  const openAdjustment = (target: 'PULL_HOME' | 'PULL_AWAY' | 'ADD_HOME' | 'ADD_AWAY') => {
+    setAdjustTarget(target);
+    setAdjustCount(1);
+    setEndConfirm(false);
+    setOptionsOpen(false);
   };
 
   if (data === null || isFinal) {
@@ -169,25 +184,30 @@ export function LiveConsole({
 
   return (
     <div className="space-y-4">
-
-      <div className="rounded-2xl border border-garnet-100 bg-white/80 p-3 sm:p-4">
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+      <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 sm:p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ash">Current rack</p>
+          <p className="text-xs text-ash">
+            {offenseTeam?.name ?? 'Offense'} · {phase}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {shooters.length === 0 && <span className="text-xs text-ash">No lineup loaded.</span>}
           {shooters.map((slot, idx) => {
             const current = currentShooterIndex % Math.max(shooters.length, 1) === idx;
             const lastResult = lastResultByShooter.get(slot.player.id);
             const made = lastResult ? isMake(lastResult) : false;
-            const isMiss = lastResult === ResultType.MISS;
+            const missed = lastResult === ResultType.MISS;
             const statusClass = made
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : isMiss
-                ? 'border-rose-200 bg-rose-50 text-rose-600'
-                : 'border-garnet-100 text-ink';
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+              : missed
+                ? 'border-rose-300 bg-rose-50 text-rose-700'
+                : 'border-garnet-100 bg-white/90 text-ink';
             return (
               <div
                 key={slot.id}
-                className={`w-full truncate rounded-full border px-2 py-1 text-[10px] font-semibold transition sm:w-auto sm:px-4 sm:py-2 sm:text-sm ${statusClass} ${
-                  current ? 'ring-2 ring-gold-200' : ''
+                className={`truncate rounded-xl border px-3 py-2 text-sm font-semibold transition ${statusClass} ${
+                  current ? 'ring-2 ring-gold-300' : ''
                 }`}
               >
                 {slot.player.name}
@@ -197,166 +217,174 @@ export function LiveConsole({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl border border-garnet-100 bg-white/85 px-4 py-3">
-        <div className="flex items-baseline gap-2">
-          <p className="text-sm font-semibold text-ash">Shooter up</p>
-          <p className="text-lg font-bold text-garnet-600">{activeShooter?.name ?? '—'}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-garnet-100 bg-white/90 px-4 py-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-ash">Shooter up</p>
+          <p className="text-lg font-bold text-garnet-700">{activeShooter?.name ?? '—'}</p>
         </div>
-        <div className="rounded-full bg-gold-50 px-3 py-1 text-lg font-bold text-ink">{turnMakes}</div>
+        <div className="rounded-full bg-gold-50 px-3 py-1 text-sm font-semibold text-ink">Makes this rack: {turnMakes}</div>
       </div>
+
+      {actionError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+          {actionError}
+        </div>
+      )}
 
       {isScorer && !isFinal && (
         <>
-          <div className="grid gap-3 md:grid-cols-3">
-            <ShotButton label="Top Regular" onClick={() => handleShot(ResultType.TOP_REGULAR)} />
-            <ShotButton label="Top ISO" onClick={() => handleShot(ResultType.TOP_ISO)} />
-            <ShotButton label="Bottom Regular" onClick={() => handleShot(ResultType.BOTTOM_REGULAR)} />
-            <ShotButton label="Bottom ISO" onClick={() => handleShot(ResultType.BOTTOM_ISO)} />
-            <ShotButton label="Miss" variant="miss" onClick={() => handleShot(ResultType.MISS)} />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <ShotButton label="Top" onClick={() => handleShot(ResultType.TOP_REGULAR)} disabled={loadingAction} />
+            <ShotButton label="Top ISO" onClick={() => handleShot(ResultType.TOP_ISO)} disabled={loadingAction} />
+            <ShotButton
+              label="Bottom"
+              onClick={() => handleShot(ResultType.BOTTOM_REGULAR)}
+              disabled={loadingAction}
+            />
+            <ShotButton
+              label="Bottom ISO"
+              onClick={() => handleShot(ResultType.BOTTOM_ISO)}
+              disabled={loadingAction}
+            />
+            <ShotButton label="Miss" variant="miss" onClick={() => handleShot(ResultType.MISS)} disabled={loadingAction} />
             <ShotButton label="Undo" variant="undo" onClick={handleUndo} disabled={loadingAction} />
           </div>
 
-          <div className="rounded-2xl border border-garnet-100 bg-white/80 p-4">
+          <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 sm:p-4">
             <button
               type="button"
               onClick={() => setOptionsOpen((prev) => !prev)}
-              className="w-full rounded-xl border border-garnet-200 bg-parchment/70 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-100"
+              className={`w-full rounded-xl border border-garnet-200 bg-parchment/70 px-4 py-3 text-sm font-semibold text-garnet-700 ${touchClass}`}
             >
-              Options
+              {optionsOpen ? 'Hide options' : 'Show options'}
             </button>
 
             {optionsOpen && (
-              <div className="mt-3 space-y-3">
-                <div className="grid gap-3 md:grid-cols-2">
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openAdjustment('PULL_HOME')}
+                    className={`rounded-xl border border-rose-200 bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-900 ${touchClass}`}
+                  >
+                    Pull home cup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAdjustment('PULL_AWAY')}
+                    className={`rounded-xl border border-rose-200 bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-900 ${touchClass}`}
+                  >
+                    Pull away cup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAdjustment('ADD_HOME')}
+                    className={`rounded-xl border border-gold-200 bg-gold-50 px-3 py-2 text-sm font-semibold text-garnet-700 ${touchClass}`}
+                  >
+                    Add home cup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAdjustment('ADD_AWAY')}
+                    className={`rounded-xl border border-gold-200 bg-gold-50 px-3 py-2 text-sm font-semibold text-garnet-700 ${touchClass}`}
+                  >
+                    Add away cup
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => {
-                      setAdjustTarget('PULL_HOME');
-                      setAdjustCount(1);
-                      setEndConfirm(false);
+                      setEndConfirm(true);
+                      setAdjustTarget(null);
+                      setOptionsOpen(false);
                     }}
-                  className="rounded-xl border border-rose-200 bg-rose-300 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
-                >
-                  Pull home cup
-                </button>
+                    className={`rounded-xl border border-rose-300 bg-rose-600 px-4 py-3 text-sm font-semibold text-white ${touchClass}`}
+                  >
+                    End game
+                  </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setAdjustTarget('PULL_AWAY');
-                      setAdjustCount(1);
-                      setEndConfirm(false);
-                    }}
-                  className="rounded-xl border border-rose-200 bg-rose-300 px-4 py-3 text-sm font-semibold text-rose-900 hover:bg-rose-200"
-                >
-                  Pull away cup
-                </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdjustTarget('ADD_HOME');
-                      setAdjustCount(1);
-                      setEndConfirm(false);
-                    }}
-                  className="rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-100"
-                >
-                  Add home cup
-                </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdjustTarget('ADD_AWAY');
-                      setAdjustCount(1);
-                      setEndConfirm(false);
-                    }}
-                  className="rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm font-semibold text-garnet-700 hover:bg-gold-100"
-                >
-                  Add away cup
-                </button>
+                    onClick={() => router.push('/games')}
+                    className={`rounded-xl border border-garnet-200 bg-white px-4 py-3 text-sm font-semibold text-garnet-700 ${touchClass}`}
+                  >
+                    Save and exit
+                  </button>
+                </div>
               </div>
-              <button
-                  type="button"
-                  onClick={() => {
-                    setEndConfirm(true);
-                    setAdjustTarget(null);
-                  }}
-                className="w-full rounded-xl border border-rose-300 bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-500"
-              >
-                End game
-              </button>
-            </div>
             )}
 
             {adjustTarget && (
-              <div className="mt-3 rounded-xl border border-garnet-100 bg-white/90 p-3">
+              <div className="mt-3 rounded-xl border border-garnet-100 bg-white p-3">
                 <p className="text-xs uppercase tracking-wide text-ash">
-                  {adjustTarget === 'PULL_HOME' && 'Home rack pull'}
-                  {adjustTarget === 'PULL_AWAY' && 'Away rack pull'}
-                  {adjustTarget === 'ADD_HOME' && 'Add cup to home rack'}
-                  {adjustTarget === 'ADD_AWAY' && 'Add cup to away rack'}
+                  {adjustTarget === 'PULL_HOME' && 'Pull from home rack'}
+                  {adjustTarget === 'PULL_AWAY' && 'Pull from away rack'}
+                  {adjustTarget === 'ADD_HOME' && 'Add to home rack'}
+                  {adjustTarget === 'ADD_AWAY' && 'Add to away rack'}
                 </p>
-                <div className="mt-2 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setAdjustCount((c) => Math.max(1, c - 1))}
-                    className="h-10 w-10 rounded-full border border-garnet-100 bg-parchment/70 text-lg font-semibold text-ink"
-                  >
-                    –
-                  </button>
-                  <span className="text-lg font-semibold text-ink">{adjustCount}</span>
-                  <button
-                    type="button"
-                    onClick={() => setAdjustCount((c) => c + 1)}
-                    className="h-10 w-10 rounded-full border border-garnet-100 bg-parchment/70 text-lg font-semibold text-ink"
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const isAdd = adjustTarget === 'ADD_HOME' || adjustTarget === 'ADD_AWAY';
-                      const resultType =
-                        adjustTarget === 'PULL_HOME' || adjustTarget === 'ADD_HOME'
-                          ? ResultType.PULL_HOME
-                          : ResultType.PULL_AWAY;
-                      const count = isAdd ? -adjustCount : adjustCount;
-                      await handlePull(resultType, count);
-                      setAdjustTarget(null);
-                    }}
-                    className="ml-auto rounded-lg bg-garnet-600 px-4 py-2 text-sm font-semibold text-sand hover:bg-garnet-500"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAdjustTarget(null)}
-                    className="rounded-lg border border-garnet-200 px-3 py-2 text-sm font-semibold text-garnet-600 hover:bg-gold-100"
-                  >
-                    Cancel
-                  </button>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {[1, 2, 3, 5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setAdjustCount(value)}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${touchClass} ${
+                        adjustCount === value
+                          ? 'border-garnet-300 bg-garnet-600 text-white'
+                          : 'border-garnet-100 bg-parchment/70 text-ink'
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const isAdd = adjustTarget === 'ADD_HOME' || adjustTarget === 'ADD_AWAY';
+                        const resultType =
+                          adjustTarget === 'PULL_HOME' || adjustTarget === 'ADD_HOME'
+                            ? ResultType.PULL_HOME
+                            : ResultType.PULL_AWAY;
+                        const count = isAdd ? -adjustCount : adjustCount;
+                        await handlePull(resultType, count);
+                        setAdjustTarget(null);
+                      }}
+                      className={`rounded-lg bg-garnet-600 px-4 py-2 text-sm font-semibold text-sand ${touchClass}`}
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustTarget(null)}
+                      className={`rounded-lg border border-garnet-200 px-3 py-2 text-sm font-semibold text-garnet-600 ${touchClass}`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {endConfirm && (
               <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
-                <p className="text-sm font-semibold text-rose-700">End game now?</p>
-                <p className="text-xs text-rose-600">This will finalize the game immediately.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <p className="text-sm font-semibold text-rose-700">Finalize this game now?</p>
+                <p className="text-xs text-rose-600">This locks the game in final status.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={async () => {
                       await handleFinalize();
                       setEndConfirm(false);
-                      setOptionsOpen(false);
                     }}
-                    className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500"
+                    className={`rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white ${touchClass}`}
                   >
                     Confirm end
                   </button>
                   <button
                     type="button"
                     onClick={() => setEndConfirm(false)}
-                    className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100"
+                    className={`rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 ${touchClass}`}
                   >
                     Cancel
                   </button>
@@ -366,15 +394,12 @@ export function LiveConsole({
           </div>
         </>
       )}
-    </div>
-  );
-}
 
-function ScoreTile({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-garnet-100 bg-white/80 px-3 py-2">
-      <p className="text-xs uppercase tracking-wide text-ash">{label}</p>
-      <p className="text-3xl font-bold text-garnet-600">{value}</p>
+      {!isScorer && (
+        <div className="rounded-xl border border-garnet-100 bg-white/75 px-3 py-2 text-xs text-ash">
+          View-only mode. Live score updates refresh automatically.
+        </div>
+      )}
     </div>
   );
 }
@@ -392,16 +417,16 @@ function ShotButton({
 }) {
   const base =
     variant === 'undo'
-      ? 'border-amber-200 bg-amber-500 text-ink hover:bg-amber-400'
+      ? 'border-amber-200 bg-amber-400 text-ink'
       : variant === 'miss'
-        ? 'border-garnet-100 bg-white text-ink hover:border-garnet-300'
-        : 'border-garnet-300/70 bg-garnet-600 text-sand hover:bg-garnet-500';
+        ? 'border-garnet-200 bg-white text-ink'
+        : 'border-garnet-300/70 bg-garnet-600 text-sand';
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`h-20 rounded-xl border text-lg font-bold shadow transition disabled:opacity-50 ${base}`}
+      className={`h-14 rounded-xl border px-2 text-sm font-bold shadow-sm transition disabled:opacity-50 ${base} ${touchClass}`}
     >
       {label}
     </button>

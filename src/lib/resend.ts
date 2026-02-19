@@ -28,6 +28,7 @@ export async function sendResendEmail({ to, subject, html, text }: SendEmailInpu
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
+    signal: AbortSignal.timeout(12000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'

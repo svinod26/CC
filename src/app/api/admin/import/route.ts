@@ -1,4 +1,5 @@
 import { authOptions } from '@/lib/auth';
+import { logAdminAudit } from '@/lib/admin-audit';
 import { parseWorkbook } from '@/lib/excel';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
@@ -101,6 +102,22 @@ export async function POST(req: Request) {
       }
     });
   }
+
+  await logAdminAudit({
+    actorUserId: session.user.id,
+    gameId: null,
+    action: 'SEASON_IMPORT',
+    entityType: 'Season',
+    entityId: season.id,
+    details: {
+      seasonName: season.name,
+      year: season.year,
+      conferences: parsedWorkbook.conferences.length,
+      teams: parsedWorkbook.teams.length,
+      players: parsedWorkbook.players.length,
+      scheduleRows: parsedWorkbook.schedule.length
+    }
+  });
 
   return NextResponse.json({ ok: true, seasonId: season.id });
 }

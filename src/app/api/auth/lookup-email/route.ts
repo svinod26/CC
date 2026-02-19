@@ -7,7 +7,10 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const json = await req.json();
+  const json = await req.json().catch(() => null);
+  if (!json || typeof json !== 'object') {
+    return NextResponse.json({ found: false }, { status: 400 });
+  }
   const parsed = schema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ found: false }, { status: 400 });

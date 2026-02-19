@@ -19,7 +19,7 @@ type LiveGame = {
 export function LiveScorebug({ gameId, initialData }: { gameId: string; initialData: LiveGame }) {
   const { data } = useSWR<LiveGame>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: initialData,
-    refreshInterval: 5000
+    refreshInterval: 1200
   });
 
   if (!data) return null;

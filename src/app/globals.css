@@ -24,3 +24,10 @@ textarea {
 button {
   @apply transition;
 }
+
+button,
+[role='button'],
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}

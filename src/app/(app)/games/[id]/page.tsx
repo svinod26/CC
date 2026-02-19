@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Viewport } from 'next';
 import { prisma } from '@/lib/prisma';
 import { LiveConsole } from '@/components/live-console';
 import { advancedStats, baseRatingStats, boxScore, defaultMultipliers, winnerFromRemaining } from '@/lib/stats';
@@ -8,6 +9,14 @@ import { LiveBoxScores } from '@/components/live-box-scores';
 import { LivePlayByPlay } from '@/components/live-play-by-play';
 import { DeleteGameButton } from '@/components/delete-game-button';
 import { LiveScorebug } from '@/components/live-scorebug';
+import { AdminGameAdjustments } from '@/components/admin-game-adjustments';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false
+};
 
 export default async function GamePage({ params }: { params: { id: string } }) {
   const session = await getServerAuthSession();
@@ -140,6 +149,56 @@ export default async function GamePage({ params }: { params: { id: string } }) {
   );
   const canScore = isScorer;
   const isAdmin = session?.user?.role === 'ADMIN';
+  const mergedTurns = game.turns.reduce<
+    {
+      key: string;
+      offenseTeamId: string | null;
+      offenseTeamName: string;
+      events: (typeof game.turns)[number]['events'];
+      sourceTurnIndexes: number[];
+    }[]
+  >((groups, turn) => {
+    const last = groups[groups.length - 1];
+    const offenseTeamName = turn.offenseTeam?.name ?? 'Offense';
+    if (last && last.offenseTeamId === turn.offenseTeamId) {
+      last.events.push(...turn.events);
+      last.sourceTurnIndexes.push(turn.turnIndex);
+      return groups;
+    }
+    groups.push({
+      key: turn.id,
+      offenseTeamId: turn.offenseTeamId ?? null,
+      offenseTeamName,
+      events: [...turn.events],
+      sourceTurnIndexes: [turn.turnIndex]
+    });
+    return groups;
+  }, []);
+  const adminPlayers = Array.from(
+    new Map(
+      game.lineups
+        .sort((a, b) => {
+          if (a.teamId === game.homeTeamId && b.teamId !== game.homeTeamId) return -1;
+          if (a.teamId !== game.homeTeamId && b.teamId === game.homeTeamId) return 1;
+          if (a.teamId === game.awayTeamId && b.teamId !== game.awayTeamId) return 1;
+          if (a.teamId !== game.awayTeamId && b.teamId === game.awayTeamId) return -1;
+          return a.orderIndex - b.orderIndex;
+        })
+        .map((slot) => [
+          slot.playerId,
+          {
+            id: slot.playerId,
+            name: slot.player.name ?? 'Unknown',
+            teamName:
+              slot.teamId === game.homeTeamId
+                ? game.homeTeam?.name ?? 'Home'
+                : slot.teamId === game.awayTeamId
+                  ? game.awayTeam?.name ?? 'Away'
+                  : 'Team'
+          }
+        ])
+    ).values()
+  );
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -323,11 +382,11 @@ export default async function GamePage({ params }: { params: { id: string } }) {
       <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <h2 className="text-base font-semibold text-ink sm:text-lg">Game flow</h2>
         <div className="mt-3 max-h-96 space-y-3 overflow-y-auto pr-2 text-sm text-ink">
-          {game.turns.length === 0 && <p className="text-ash">No events logged.</p>}
-          {game.turns.map((turn) => (
-            <div key={turn.id} className="rounded-xl border border-garnet-100 bg-parchment/70 p-3">
+          {mergedTurns.length === 0 && <p className="text-ash">No events logged.</p>}
+          {mergedTurns.map((turn, index) => (
+            <div key={turn.key} className="rounded-xl border border-garnet-100 bg-parchment/70 p-3">
               <p className="text-xs uppercase tracking-wide text-ash">
-                Turn {turn.turnIndex} · {turn.offenseTeam?.name ?? 'Offense'}
+                Turn {index + 1} · {turn.offenseTeamName}
               </p>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 {turn.events.map((event) => (
@@ -353,15 +412,20 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
       {isAdmin && (
         <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-rose-700">Admin controls</h2>
               <p className="text-xs text-rose-600">
-                Delete this game to remove it from the season history.
+                Manage finalized score corrections or delete this game from season history.
               </p>
             </div>
             <DeleteGameButton gameId={game.id} />
           </div>
+          {game.status === 'FINAL' && !isLegacy && (
+            <div className="mt-3">
+              <AdminGameAdjustments gameId={game.id} players={adminPlayers} />
+            </div>
+          )}
         </section>
       )}
     </div>

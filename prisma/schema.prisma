@@ -55,6 +55,7 @@ model User {
 
   gamesCreated Game[]   @relation("Creator")
   statTaken    Game[]   @relation("StatTaker")
+  adminAuditLogs AdminAuditLog[]
 }
 
 model Season {
@@ -175,6 +176,7 @@ model Game {
   statsSource   StatsSource  @default(TRACKED)
   legacyStats   LegacyPlayerStat[]
   legacyTeamStats LegacyTeamStat[]
+  adminAuditLogs AdminAuditLog[]
 
   @@index([status])
 }
@@ -296,4 +298,21 @@ model LegacyTeamStat {
   @@unique([gameId, teamId])
   @@index([teamId])
   @@index([gameId])
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUserId String?
+  game        Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  gameId      String?
+  action      String
+  entityType  String
+  entityId    String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([gameId, createdAt])
+  @@index([action, createdAt])
 }

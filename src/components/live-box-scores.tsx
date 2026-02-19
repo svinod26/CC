@@ -92,7 +92,7 @@ export function LiveBoxScores({
 }) {
   const { data } = useSWR<GameStatePayload>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: initialData,
-    refreshInterval: 2500
+    refreshInterval: 1000
   });
 
   if (!data) return null;
