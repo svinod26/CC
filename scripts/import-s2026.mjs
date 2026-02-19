@@ -64,16 +64,24 @@ const normalizeEmail = (value) => {
   return String(value).trim().toLowerCase();
 };
 
-async function resetSeason(seasonName) {
+async function ensureSeason(seasonName, year) {
   const existing = await prisma.season.findFirst({ where: { name: seasonName } });
-  if (!existing) return null;
-  await prisma.game.deleteMany({ where: { seasonId: existing.id } });
-  await prisma.schedule.deleteMany({ where: { seasonId: existing.id } });
-  await prisma.teamRoster.deleteMany({ where: { seasonId: existing.id } });
-  await prisma.team.deleteMany({ where: { seasonId: existing.id } });
-  await prisma.conference.deleteMany({ where: { seasonId: existing.id } });
-  await prisma.season.delete({ where: { id: existing.id } });
-  return null;
+  if (existing) return existing;
+  return prisma.season.create({ data: { name: seasonName, year } });
+}
+
+async function clearGamePayload(gameId) {
+  await prisma.gameState.deleteMany({ where: { gameId } });
+  await prisma.shotEvent.deleteMany({ where: { gameId } });
+  await prisma.turn.deleteMany({ where: { gameId } });
+  await prisma.gameLineup.deleteMany({ where: { gameId } });
+  await prisma.legacyPlayerStat.deleteMany({ where: { gameId } });
+  await prisma.legacyTeamStat.deleteMany({ where: { gameId } });
+}
+
+async function deleteLegacyGame(gameId) {
+  await clearGamePayload(gameId);
+  await prisma.game.delete({ where: { id: gameId } });
 }
 
 async function buildPlayerResolver() {
@@ -217,35 +225,99 @@ async function createSchedule(seasonId, week, homeTeamId, awayTeamId) {
 }
 
 async function importMatchup({ seasonId, week, matchup, teamMap, resolver }) {
+  if (!matchup?.team1?.name || !matchup?.team2?.name) {
+    console.log(`Skipping malformed matchup in Week ${week}.`);
+    return;
+  }
+
   const team1 = await getOrCreateTeam(seasonId, teamMap, matchup.team1.name);
   const team2 = await getOrCreateTeam(seasonId, teamMap, matchup.team2.name);
   if (!team1 || !team2) return;
 
   const scheduleRow = await createSchedule(seasonId, week, team1.id, team2.id);
-  if (scheduleRow.gameId) {
-    await prisma.game.delete({ where: { id: scheduleRow.gameId } });
-    await prisma.schedule.update({ where: { id: scheduleRow.id }, data: { gameId: null } });
+  const trackedCandidate = await prisma.game.findFirst({
+    where: {
+      seasonId,
+      statsSource: StatsSource.TRACKED,
+      OR: [
+        { homeTeamId: team1.id, awayTeamId: team2.id },
+        { homeTeamId: team2.id, awayTeamId: team1.id }
+      ]
+    },
+    select: { id: true }
+  });
+
+  if (trackedCandidate) {
+    const linkedGame = scheduleRow.gameId
+      ? await prisma.game.findUnique({
+          where: { id: scheduleRow.gameId },
+          select: { id: true, statsSource: true }
+        })
+      : null;
+
+    if (linkedGame && linkedGame.id !== trackedCandidate.id && linkedGame.statsSource === StatsSource.LEGACY) {
+      await deleteLegacyGame(linkedGame.id);
+    }
+
+    if (scheduleRow.gameId !== trackedCandidate.id) {
+      await prisma.schedule.update({ where: { id: scheduleRow.id }, data: { gameId: trackedCandidate.id } });
+    }
+
+    console.log(`Using TRACKED game for Week ${week} ${team1.name} vs ${team2.name}; skipping legacy import.`);
+    return;
+  }
+
+  const linkedGame = scheduleRow.gameId
+    ? await prisma.game.findUnique({
+        where: { id: scheduleRow.gameId },
+        select: { id: true, statsSource: true }
+      })
+    : null;
+
+  if (linkedGame?.statsSource === StatsSource.TRACKED) {
+    console.log(`Skipping Week ${week} ${team1.name} vs ${team2.name}: existing TRACKED game takes precedence.`);
+    return;
   }
 
   const startedAt = new Date();
-  const game = await prisma.game.create({
-    data: {
-      seasonId,
-      type: GameType.LEAGUE,
-      status: GameStatus.FINAL,
-      homeTeamId: team1.id,
-      awayTeamId: team2.id,
-      startedAt,
-      endedAt: startedAt,
-      statsSource: StatsSource.LEGACY
-    }
-  });
+  let game;
+  if (linkedGame?.statsSource === StatsSource.LEGACY) {
+    await clearGamePayload(linkedGame.id);
+    game = await prisma.game.update({
+      where: { id: linkedGame.id },
+      data: {
+        seasonId,
+        type: GameType.LEAGUE,
+        status: GameStatus.FINAL,
+        homeTeamId: team1.id,
+        awayTeamId: team2.id,
+        startedAt,
+        endedAt: startedAt,
+        statsSource: StatsSource.LEGACY
+      }
+    });
+  } else {
+    game = await prisma.game.create({
+      data: {
+        seasonId,
+        type: GameType.LEAGUE,
+        status: GameStatus.FINAL,
+        homeTeamId: team1.id,
+        awayTeamId: team2.id,
+        startedAt,
+        endedAt: startedAt,
+        statsSource: StatsSource.LEGACY
+      }
+    });
+  }
 
   const legacyStats = [];
   const lineupData = [];
 
-  const ingestTeamPlayers = async (team, players, sideIndex) => {
-    for (const [idx, player] of players.entries()) {
+  const ingestTeamPlayers = async (team, players) => {
+    const safePlayers = Array.isArray(players) ? players : [];
+    for (const [idx, player] of safePlayers.entries()) {
+      if (!player) continue;
       const name = normalizeName(player.name);
       if (!isValidPlayerName(name)) continue;
       const totals = {
@@ -288,8 +360,8 @@ async function importMatchup({ seasonId, week, matchup, teamMap, resolver }) {
     }
   };
 
-  await ingestTeamPlayers(team1, matchup.team1.players, 0);
-  await ingestTeamPlayers(team2, matchup.team2.players, 1);
+  await ingestTeamPlayers(team1, matchup.team1.players);
+  await ingestTeamPlayers(team2, matchup.team2.players);
 
   if (lineupData.length) {
     await prisma.gameLineup.createMany({ data: lineupData, skipDuplicates: true });
@@ -337,8 +409,7 @@ async function main() {
     return;
   }
 
-  await resetSeason('S2026');
-  const season = await prisma.season.create({ data: { name: 'S2026', year: 2026 } });
+  const season = await ensureSeason('S2026', 2026);
   const teamMap = new Map();
 
   const resolver = await buildPlayerResolver();

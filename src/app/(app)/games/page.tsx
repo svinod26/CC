@@ -25,7 +25,7 @@ export default async function GamesPage({
       ...(season ? { seasonId: season.id } : {}),
       ...(typeFilter ? { type: typeFilter } : {})
     },
-    orderBy: { startedAt: 'desc' },
+    orderBy: [{ scheduleEntry: { week: 'desc' } }, { startedAt: 'desc' }],
     include: { homeTeam: true, awayTeam: true, state: true, scheduleEntry: true, season: true }
   });
 
