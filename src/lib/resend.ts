@@ -26,9 +26,14 @@ export async function sendResendEmail({ to, subject, html, text }: SendEmailInpu
   if (text) payload.text = text;
   if (replyTo) payload.reply_to = replyTo;
 
+  const timeoutSignal =
+    typeof AbortSignal !== 'undefined' && typeof (AbortSignal as any).timeout === 'function'
+      ? (AbortSignal as any).timeout(12000)
+      : undefined;
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    signal: AbortSignal.timeout(12000),
+    ...(timeoutSignal ? { signal: timeoutSignal } : {}),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
