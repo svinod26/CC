@@ -221,6 +221,10 @@ async function ensureRoster(seasonId, teamId, playerId) {
 async function createSchedule(seasonId, week, homeTeamId, awayTeamId) {
   const existing = await prisma.schedule.findFirst({ where: { seasonId, week, homeTeamId, awayTeamId } });
   if (existing) return existing;
+  const existingReversed = await prisma.schedule.findFirst({
+    where: { seasonId, week, homeTeamId: awayTeamId, awayTeamId: homeTeamId }
+  });
+  if (existingReversed) return existingReversed;
   return prisma.schedule.create({ data: { seasonId, week, homeTeamId, awayTeamId } });
 }
 
@@ -235,38 +239,6 @@ async function importMatchup({ seasonId, week, matchup, teamMap, resolver }) {
   if (!team1 || !team2) return;
 
   const scheduleRow = await createSchedule(seasonId, week, team1.id, team2.id);
-  const trackedCandidate = await prisma.game.findFirst({
-    where: {
-      seasonId,
-      statsSource: StatsSource.TRACKED,
-      OR: [
-        { homeTeamId: team1.id, awayTeamId: team2.id },
-        { homeTeamId: team2.id, awayTeamId: team1.id }
-      ]
-    },
-    select: { id: true }
-  });
-
-  if (trackedCandidate) {
-    const linkedGame = scheduleRow.gameId
-      ? await prisma.game.findUnique({
-          where: { id: scheduleRow.gameId },
-          select: { id: true, statsSource: true }
-        })
-      : null;
-
-    if (linkedGame && linkedGame.id !== trackedCandidate.id && linkedGame.statsSource === StatsSource.LEGACY) {
-      await deleteLegacyGame(linkedGame.id);
-    }
-
-    if (scheduleRow.gameId !== trackedCandidate.id) {
-      await prisma.schedule.update({ where: { id: scheduleRow.id }, data: { gameId: trackedCandidate.id } });
-    }
-
-    console.log(`Using TRACKED game for Week ${week} ${team1.name} vs ${team2.name}; skipping legacy import.`);
-    return;
-  }
-
   const linkedGame = scheduleRow.gameId
     ? await prisma.game.findUnique({
         where: { id: scheduleRow.gameId },
@@ -275,7 +247,47 @@ async function importMatchup({ seasonId, week, matchup, teamMap, resolver }) {
     : null;
 
   if (linkedGame?.statsSource === StatsSource.TRACKED) {
-    console.log(`Skipping Week ${week} ${team1.name} vs ${team2.name}: existing TRACKED game takes precedence.`);
+    console.log(`Using TRACKED game for Week ${week} ${team1.name} vs ${team2.name}; skipping legacy import.`);
+    return;
+  }
+
+  // Safety: only match tracked games that already belong to the same week + matchup.
+  // Never re-link based on team pair alone, which can cross-link repeated matchups across weeks.
+  const trackedCandidates = await prisma.game.findMany({
+    where: {
+      seasonId,
+      statsSource: StatsSource.TRACKED,
+      scheduleEntry: {
+        is: {
+          seasonId,
+          week,
+          OR: [
+            { homeTeamId: team1.id, awayTeamId: team2.id },
+            { homeTeamId: team2.id, awayTeamId: team1.id }
+          ]
+        }
+      }
+    },
+    select: { id: true },
+    take: 2
+  });
+
+  if (trackedCandidates.length > 1) {
+    console.log(
+      `WARNING: Multiple TRACKED games found for Week ${week} ${team1.name} vs ${team2.name}; leaving schedule link unchanged and skipping legacy import.`
+    );
+    return;
+  }
+
+  if (trackedCandidates.length === 1) {
+    const trackedCandidate = trackedCandidates[0];
+    if (linkedGame && linkedGame.id !== trackedCandidate.id && linkedGame.statsSource === StatsSource.LEGACY) {
+      await deleteLegacyGame(linkedGame.id);
+    }
+    if (scheduleRow.gameId !== trackedCandidate.id) {
+      await prisma.schedule.update({ where: { id: scheduleRow.id }, data: { gameId: trackedCandidate.id } });
+    }
+    console.log(`Using TRACKED game for Week ${week} ${team1.name} vs ${team2.name}; skipping legacy import.`);
     return;
   }
 
