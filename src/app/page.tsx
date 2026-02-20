@@ -67,17 +67,18 @@ export default async function HomePage() {
       }
     }
   });
-  const inProgressPromise = prisma.game.findFirst({
+  const inProgressPromise = prisma.game.findMany({
     where: { status: 'IN_PROGRESS', seasonId: currentSeason.id },
     orderBy: { startedAt: 'desc' },
-    include: { homeTeam: true, awayTeam: true }
+    take: 6,
+    include: { homeTeam: true, awayTeam: true, scheduleEntry: true, state: true }
   });
 
   const playerPromise = session?.user?.email
     ? prisma.player.findFirst({ where: { email: session.user.email } })
     : Promise.resolve(null);
 
-  const [recentLeagueGamesRaw, player, latestWeekEntry, inProgress] = await Promise.all([
+  const [recentLeagueGamesRaw, player, latestWeekEntry, inProgressGames] = await Promise.all([
     recentGamesPromise,
     playerPromise,
     latestWeekPromise,
@@ -308,13 +309,23 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {inProgress && (
-        <Link
-          href={`/games/${inProgress.id}`}
-          className="block rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm"
-        >
-          Live now: {inProgress.homeTeam?.name ?? 'Home'} vs {inProgress.awayTeam?.name ?? 'Away'} · Tap to watch
-        </Link>
+      {inProgressGames.length > 0 && (
+        <div className="space-y-2">
+          {inProgressGames.map((liveGame) => (
+            <Link
+              key={liveGame.id}
+              href={`/games/${liveGame.id}`}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm"
+            >
+              <span>
+                Live now: {liveGame.homeTeam?.name ?? 'Home'} vs {liveGame.awayTeam?.name ?? 'Away'}
+              </span>
+              <span className="shrink-0 text-xs uppercase tracking-wide text-emerald-700">
+                {liveGame.scheduleEntry?.week ? `Week ${liveGame.scheduleEntry.week}` : liveGame.type}
+              </span>
+            </Link>
+          ))}
+        </div>
       )}
       <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 shadow sm:p-5">

@@ -60,8 +60,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!isScorer) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  if (game.status === GameStatus.FINAL) {
-    return NextResponse.json({ error: 'Game is finalized' }, { status: 403 });
+  if (game.status !== GameStatus.IN_PROGRESS) {
+    return NextResponse.json({ error: 'Only in-progress games can be edited' }, { status: 403 });
   }
 
   const currentTurn = game.turns[0];
@@ -95,6 +95,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const turnShooterIds = Array.isArray(ensuredTurn.shootersJson)
     ? (ensuredTurn.shootersJson as string[])
     : [];
+  const eligibleShooterIds = turnShooterIds.length
+    ? turnShooterIds
+    : offenseLineup.map((lineupSlot) => lineupSlot.playerId);
+  if (!isPull && !data.shooterId) {
+    return NextResponse.json({ error: 'Shooter is required for shot events' }, { status: 400 });
+  }
+  if (!isPull && data.shooterId && eligibleShooterIds.length > 0 && !eligibleShooterIds.includes(data.shooterId)) {
+    return NextResponse.json({ error: 'Shooter is not active in this turn' }, { status: 400 });
+  }
   const turnLineupLength = Math.max((turnShooterIds.length || offenseLineup.length || 6), 1);
 
   const cupsTargetBefore =

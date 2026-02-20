@@ -19,6 +19,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (!isScorer) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  if (game.status === GameStatus.FINAL) {
+    return NextResponse.json({ ok: true });
+  }
+  if (game.status !== GameStatus.IN_PROGRESS) {
+    return NextResponse.json({ error: 'Only in-progress games can be finalized' }, { status: 400 });
+  }
 
   await prisma.game.update({
     where: { id: params.id },
