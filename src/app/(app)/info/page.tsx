@@ -22,7 +22,8 @@ export default function InfoPage() {
               Weights: top {`1.10`}, bottom {`1.00`}, top ISO {`1.20`}, bottom ISO {`1.05`}.
             </li>
             <li>
-              <span className="font-semibold text-ink">Player rating</span>: Adjusted FGM × FG% × league avg Adjusted FGM × league avg FG%.
+              <span className="font-semibold text-ink">Player rating</span>: (Adjusted FGM / game) × FG% × league avg
+              (Adjusted FGM / game) × league avg FG%.
             </li>
             <li>
               <span className="font-semibold text-ink">Rating / shot</span>: player rating ÷ total attempts.

@@ -1,4 +1,6 @@
 .next
+.next_prev_*
+backups/
 node_modules
 .env
 .env.local

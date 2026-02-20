@@ -15,6 +15,7 @@ export const metadata = {
 type PlayerAgg = {
   id: string;
   name: string;
+  games: number;
   makes: number;
   attempts: number;
   trackedAttempts: number;
@@ -82,6 +83,7 @@ export default async function PlayerHubPage({
   });
 
   const players = new Map<string, PlayerAgg>();
+  const playerGameIds = new Map<string, Set<string>>();
 
   for (const event of events) {
     if (!event.shooterId || !event.shooter) continue;
@@ -90,6 +92,7 @@ export default async function PlayerHubPage({
       {
         id: event.shooterId,
         name: event.shooter.name ?? 'Unknown',
+        games: 0,
         makes: 0,
         attempts: 0,
         trackedAttempts: 0,
@@ -104,6 +107,12 @@ export default async function PlayerHubPage({
         clutchMakes: 0,
         weekMakes: new Array(weekCount).fill(0)
       };
+    const eventGameId = event.gameId;
+    if (eventGameId) {
+      const gameSet = playerGameIds.get(event.shooterId) ?? new Set<string>();
+      gameSet.add(eventGameId);
+      playerGameIds.set(event.shooterId, gameSet);
+    }
 
     if (isShot(event.resultType as any)) {
       current.attempts += 1;
@@ -145,6 +154,7 @@ export default async function PlayerHubPage({
       {
         id: stat.playerId,
         name: stat.player.name ?? 'Unknown',
+        games: 0,
         makes: 0,
         attempts: 0,
         trackedAttempts: 0,
@@ -159,6 +169,12 @@ export default async function PlayerHubPage({
         clutchMakes: 0,
         weekMakes: new Array(weekCount).fill(0)
       };
+    const statGameId = stat.gameId;
+    if (statGameId) {
+      const gameSet = playerGameIds.get(stat.playerId) ?? new Set<string>();
+      gameSet.add(statGameId);
+      playerGameIds.set(stat.playerId, gameSet);
+    }
 
     const breakdown = stat.topRegular + stat.topIso + stat.bottomRegular + stat.bottomIso;
     const makes = stat.totalCups > 0 ? stat.totalCups : breakdown;
@@ -186,24 +202,25 @@ export default async function PlayerHubPage({
   }
 
   const list = Array.from(players.values());
+  const ratedRows = list.filter((row) => row.attempts > 0);
   const avgAdjusted =
-    list.length > 0
-      ? list
-          .filter((row) => row.attempts > 0)
-          .reduce((sum, row) => sum + row.weightedPoints, 0) /
-        Math.max(1, list.filter((row) => row.attempts > 0).length)
+    ratedRows.length > 0
+      ? ratedRows.reduce((sum, row) => {
+          const games = playerGameIds.get(row.id)?.size ?? 0;
+          return sum + (games > 0 ? row.weightedPoints / games : 0);
+        }, 0) / ratedRows.length
       : 0;
   const avgFg =
-    list.length > 0
-      ? list
-          .filter((row) => row.attempts > 0)
-          .reduce((sum, row) => sum + row.makes / row.attempts, 0) /
-        Math.max(1, list.filter((row) => row.attempts > 0).length)
+    ratedRows.length > 0
+      ? ratedRows.reduce((sum, row) => sum + row.makes / row.attempts, 0) / ratedRows.length
       : 0;
   list.forEach((row) => {
+    const games = playerGameIds.get(row.id)?.size ?? 0;
+    row.games = games;
+    const adjustedFgm = games > 0 ? row.weightedPoints / games : 0;
     const fg = row.attempts ? row.makes / row.attempts : 0;
     const rating =
-      row.attempts > 0 && avgAdjusted > 0 && avgFg > 0 ? row.weightedPoints * fg * avgAdjusted * avgFg : 0;
+      row.attempts > 0 && adjustedFgm > 0 && avgAdjusted > 0 && avgFg > 0 ? adjustedFgm * fg * avgAdjusted * avgFg : 0;
     row.playerRating = rating;
     row.ratingPerShot = row.attempts > 0 ? rating / row.attempts : 0;
   });
@@ -259,7 +276,7 @@ export default async function PlayerHubPage({
     },
     {
       title: 'Top rating per shot',
-      subtitle: 'Player rating per shot (Adjusted FGM × FG% scaled by league averages).',
+      subtitle: 'Player rating per shot ((Adjusted FGM / game) × FG% scaled by league averages).',
       rows: topPPS,
       valueFor: (row: PlayerAgg) => Number((row.ratingPerShot || 0).toFixed(2)),
       suffix: ''

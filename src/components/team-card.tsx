@@ -15,7 +15,7 @@ type TeamCardProps = {
   losses: number;
   margin: number;
   fg: string;
-  clutch: number;
+  trackedShots: number;
   pulled: number;
   weekly: number[];
   roster: RosterPlayer[];
@@ -30,7 +30,7 @@ export function TeamCard({
   losses,
   margin,
   fg,
-  clutch,
+  trackedShots,
   pulled,
   weekly,
   roster
@@ -66,7 +66,7 @@ export function TeamCard({
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs sm:text-sm">
         <TeamStat label="Margin" value={margin} />
         <TeamStat label="FG%" value={fg} />
-        <TeamStat label="Clutch (tracked)" value={clutch} />
+        <TeamStat label="Tracked shots" value={trackedShots} />
       </div>
       <p className="mt-2 text-xs text-ash">Pulled cups: {pulled}</p>
 

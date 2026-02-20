@@ -132,7 +132,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         .sort((a, b) => b.weightedPoints - a.weightedPoints)
     : [];
 
-  const mvp = tempoRows[0] ?? ratingRows[0];
+  const mvp = ratingRows[0];
   const ratingLeaders = ratingRows.filter((row) => row.id !== mvp?.id).slice(0, 3);
 
   const weekLabel = game.scheduleEntry?.week
@@ -274,9 +274,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-ink sm:text-lg">MVP</h2>
-            <p className="text-[11px] text-ash sm:text-xs">
-              {tempoRows.length > 0 ? 'Tempo rating (temporal scaling) if tracked.' : 'Adjusted FGM (base weights).'}
-            </p>
+            <p className="text-[11px] text-ash sm:text-xs">Adjusted FGM (base cup weights).</p>
           </div>
           <span className="rounded-full border border-gold-300 bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-garnet-600">
             {isLegacy ? 'Legacy' : 'Tracked'}

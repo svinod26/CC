@@ -141,11 +141,11 @@ function TeamTable({ title, rows }: { title: string; rows: BoxRow[] }) {
           <thead className="bg-parchment/80 text-ash">
             <tr>
               <th className="px-3 py-2 text-left">Name</th>
+              <th className="px-3 py-2 text-center">Total Makes</th>
               <th className="px-3 py-2 text-center">Top</th>
               <th className="px-3 py-2 text-center">Top ISO</th>
               <th className="px-3 py-2 text-center">Bottom</th>
               <th className="px-3 py-2 text-center">Bottom ISO</th>
-              <th className="px-3 py-2 text-center">Total makes</th>
               <th className="px-3 py-2 text-center">Misses</th>
               <th className="px-3 py-2 text-center">FG%</th>
             </tr>
@@ -160,11 +160,11 @@ function TeamTable({ title, rows }: { title: string; rows: BoxRow[] }) {
                     className="text-ink hover:text-garnet-600"
                   />
                 </td>
+                <td className="px-3 py-2 text-center">{row.makes}</td>
                 <td className="px-3 py-2 text-center">{row.topRegular}</td>
                 <td className="px-3 py-2 text-center">{row.topIso}</td>
                 <td className="px-3 py-2 text-center">{row.bottomRegular}</td>
                 <td className="px-3 py-2 text-center">{row.bottomIso}</td>
-                <td className="px-3 py-2 text-center">{row.makes}</td>
                 <td className="px-3 py-2 text-center">{row.misses}</td>
                 <td className="px-3 py-2 text-center">
                   {row.attempts > 0 ? ((row.makes / row.attempts) * 100).toFixed(1) : '—'}

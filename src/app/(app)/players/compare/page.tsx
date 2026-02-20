@@ -23,6 +23,7 @@ type SearchParams = {
 type PlayerStat = {
   id: string;
   name: string;
+  gameCount: number;
   makes: number;
   attempts: number;
   trackedAttempts: number;
@@ -64,6 +65,7 @@ const baseWeightFor = (resultType: string) => {
 const buildEmpty = (id: string, name: string, weekCount: number): PlayerStat => ({
   id,
   name,
+  gameCount: 0,
   makes: 0,
   attempts: 0,
   trackedAttempts: 0,
@@ -163,6 +165,7 @@ export default async function PlayerComparePage({
   });
 
   const stats = new Map<string, PlayerStat>();
+  const selectedGameIds = new Map<string, Set<string>>();
   for (const id of selectedIds) {
     const player = players.find((p) => p.id === id);
     if (player) stats.set(id, buildEmpty(player.id, player.name, weekCount));
@@ -172,6 +175,12 @@ export default async function PlayerComparePage({
     if (!event.shooterId || !event.shooter) continue;
     const current =
       stats.get(event.shooterId) ?? buildEmpty(event.shooterId, event.shooter.name ?? 'Unknown', weekCount);
+    const eventGameId = event.gameId;
+    if (eventGameId) {
+      const gameSet = selectedGameIds.get(event.shooterId) ?? new Set<string>();
+      gameSet.add(eventGameId);
+      selectedGameIds.set(event.shooterId, gameSet);
+    }
 
     if (isShot(event.resultType as any)) {
       current.attempts += 1;
@@ -202,6 +211,12 @@ export default async function PlayerComparePage({
     if (!stat.playerId || !stat.player) continue;
     const current =
       stats.get(stat.playerId) ?? buildEmpty(stat.playerId, stat.player.name ?? 'Unknown', weekCount);
+    const statGameId = stat.gameId;
+    if (statGameId) {
+      const gameSet = selectedGameIds.get(stat.playerId) ?? new Set<string>();
+      gameSet.add(statGameId);
+      selectedGameIds.set(stat.playerId, gameSet);
+    }
     const breakdown = stat.topRegular + stat.topIso + stat.bottomRegular + stat.bottomIso;
     const makes = stat.totalCups > 0 ? stat.totalCups : breakdown;
     const attempts = makes + stat.misses;
@@ -221,10 +236,11 @@ export default async function PlayerComparePage({
     stats.set(stat.playerId, current);
   }
 
-  const leagueAgg = new Map<string, { adjusted: number; makes: number; attempts: number }>();
+  const leagueAgg = new Map<string, { adjusted: number; makes: number; attempts: number; gameIds: Set<string> }>();
   for (const event of leagueEvents) {
     if (!event.shooterId) continue;
-    const current = leagueAgg.get(event.shooterId) ?? { adjusted: 0, makes: 0, attempts: 0 };
+    const current = leagueAgg.get(event.shooterId) ?? { adjusted: 0, makes: 0, attempts: 0, gameIds: new Set<string>() };
+    if (event.gameId) current.gameIds.add(event.gameId);
     current.attempts += 1;
     if (isMake(event.resultType as any)) {
       current.makes += 1;
@@ -234,7 +250,8 @@ export default async function PlayerComparePage({
   }
   for (const stat of leagueLegacyStats) {
     if (!stat.playerId) continue;
-    const current = leagueAgg.get(stat.playerId) ?? { adjusted: 0, makes: 0, attempts: 0 };
+    const current = leagueAgg.get(stat.playerId) ?? { adjusted: 0, makes: 0, attempts: 0, gameIds: new Set<string>() };
+    if (stat.gameId) current.gameIds.add(stat.gameId);
     const breakdown = stat.topRegular + stat.topIso + stat.bottomRegular + stat.bottomIso;
     const makes = stat.totalCups > 0 ? stat.totalCups : breakdown;
     const attempts = makes + stat.misses;
@@ -247,10 +264,10 @@ export default async function PlayerComparePage({
       stat.bottomIso * defaultMultipliers.bottomIso;
     leagueAgg.set(stat.playerId, current);
   }
-  const leagueValues = Array.from(leagueAgg.values()).filter((row) => row.attempts > 0);
+  const leagueValues = Array.from(leagueAgg.values()).filter((row) => row.attempts > 0 && row.gameIds.size > 0);
   const leagueAvgAdjusted =
     leagueValues.length > 0
-      ? leagueValues.reduce((sum, row) => sum + row.adjusted, 0) / leagueValues.length
+      ? leagueValues.reduce((sum, row) => sum + row.adjusted / row.gameIds.size, 0) / leagueValues.length
       : 0;
   const leagueAvgFg =
     leagueValues.length > 0
@@ -259,10 +276,12 @@ export default async function PlayerComparePage({
 
   const selected = selectedIds.map((id) => stats.get(id)).filter((row): row is PlayerStat => Boolean(row));
   selected.forEach((row) => {
+    row.gameCount = selectedGameIds.get(row.id)?.size ?? 0;
+    const adjustedFgmPerGame = row.gameCount > 0 ? row.adjustedFgm / row.gameCount : 0;
     const fg = row.attempts ? row.makes / row.attempts : 0;
     row.playerRating =
-      row.attempts > 0 && leagueAvgAdjusted > 0 && leagueAvgFg > 0
-        ? row.adjustedFgm * fg * leagueAvgAdjusted * leagueAvgFg
+      row.attempts > 0 && adjustedFgmPerGame > 0 && leagueAvgAdjusted > 0 && leagueAvgFg > 0
+        ? adjustedFgmPerGame * fg * leagueAvgAdjusted * leagueAvgFg
         : 0;
   });
   const comparePair = selected.length === 2 ? ([selected[0], selected[1]] as const) : null;

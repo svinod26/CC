@@ -310,11 +310,12 @@ export async function PlayerDashboard({
   const pctTops = gamesPlayed ? percentile(topsList, avgTops) : null;
   const pctBottoms = gamesPlayed ? percentile(bottomsList, avgBottoms) : null;
   const pctFg = gamesPlayed ? percentile(fgList, avgFg) : null;
+  const adjustedFgmPerGame = gamesPlayed > 0 ? adjustedFgm / gamesPlayed : 0;
   const leagueAvgAdjusted =
     adjustedList.length > 0 ? adjustedList.reduce((sum, val) => sum + val, 0) / adjustedList.length : 0;
   const leagueAvgFg = fgList.length > 0 ? fgList.reduce((sum, val) => sum + val, 0) / fgList.length : 0;
-  const canRate = attempts > 0 && leagueAvgAdjusted > 0 && leagueAvgFg > 0;
-  const playerRating = canRate ? adjustedFgm * fgPct * leagueAvgAdjusted * leagueAvgFg : 0;
+  const canRate = attempts > 0 && adjustedFgmPerGame > 0 && leagueAvgAdjusted > 0 && leagueAvgFg > 0;
+  const playerRating = canRate ? adjustedFgmPerGame * fgPct * leagueAvgAdjusted * leagueAvgFg : 0;
   const ratingPerShot = canRate ? playerRating / attempts : 0;
 
   return (
@@ -379,11 +380,12 @@ export async function PlayerDashboard({
           </div>
           <p className="mt-2 hidden text-xs text-ash sm:block">
             Adjusted FGM weights: top {defaultMultipliers.top}, bottom {defaultMultipliers.bottom}, iso top{' '}
-            {defaultMultipliers.topIso}, iso bottom {defaultMultipliers.bottomIso}. Player rating = Adjusted FGM × FG% ×
-            league avg Adjusted FGM × league avg FG%.{hasTracked ? ' Tempo rating applies temporal scaling.' : ''}
+            {defaultMultipliers.topIso}, iso bottom {defaultMultipliers.bottomIso}. Player rating = (Adjusted FGM / game)
+            × FG% × league avg (Adjusted FGM / game) × league avg FG%.
+            {hasTracked ? ' Tempo rating applies temporal scaling.' : ''}
           </p>
           <div className="mt-4 space-y-3 text-sm text-ink">
-            <MetricRow label="Adjusted FGM" value={attempts ? adjustedFgm.toFixed(2) : '—'} />
+            <MetricRow label="Adjusted FGM / game" value={gamesPlayed > 0 ? adjustedFgmPerGame.toFixed(2) : '—'} />
             <MetricRow label="Player rating" value={canRate ? playerRating.toFixed(2) : '—'} />
             <MetricRow label="Rating per shot" value={canRate ? ratingPerShot.toFixed(2) : '—'} />
             <MetricRow label="Tempo rating (tracked)" value={hasTracked ? tempoRating.toFixed(2) : '—'} />

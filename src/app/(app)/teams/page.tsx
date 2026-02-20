@@ -25,6 +25,7 @@ type TeamAgg = {
   topIsos: number;
   bottomIsos: number;
   clutchMakes: number;
+  clutchAttempts: number;
   pulledCups: number;
   weekNet: number[];
 };
@@ -102,6 +103,7 @@ export default async function TeamsPage({
       topIsos: 0,
       bottomIsos: 0,
       clutchMakes: 0,
+      clutchAttempts: 0,
       pulledCups: 0,
       weekNet: new Array(weekCount).fill(0)
     });
@@ -138,10 +140,17 @@ export default async function TeamsPage({
     if (!event.offenseTeamId) continue;
     const current = teamStats.get(event.offenseTeamId);
     if (!current) continue;
+    const remaining =
+      typeof event.remainingCupsBefore === 'number'
+        ? event.remainingCupsBefore
+        : typeof event.remainingCupsAfter === 'number'
+          ? event.remainingCupsAfter
+          : 100;
 
     if (isShot(event.resultType)) {
       current.attempts += 1;
       current.trackedAttempts += 1;
+      if (remaining <= 20) current.clutchAttempts += 1;
     }
 
     if (isMake(event.resultType)) {
@@ -151,7 +160,7 @@ export default async function TeamsPage({
       if (event.resultType === ResultType.BOTTOM_REGULAR || event.resultType === ResultType.BOTTOM_ISO) current.bottoms += 1;
       if (event.resultType === ResultType.BOTTOM_ISO) current.bottomIsos += 1;
 
-      if ((event.remainingCupsBefore ?? 100) <= 20) current.clutchMakes += 1;
+      if (remaining <= 20) current.clutchMakes += 1;
 
       const week = event.game?.scheduleEntry?.week;
       if (week && week >= 1 && week <= weekCount) {
@@ -213,7 +222,10 @@ export default async function TeamsPage({
     .sort((a, b) => b.topIsos + b.bottomIsos - (a.topIsos + a.bottomIsos))
     .slice(0, 10);
   const topMargin = [...list].sort((a, b) => b.margin - a.margin).slice(0, 10);
-  const topClutch = topBy('clutchMakes');
+  const topClutch = [...list]
+    .filter((team) => team.clutchAttempts > 0)
+    .sort((a, b) => b.clutchMakes / b.clutchAttempts - a.clutchMakes / a.clutchAttempts)
+    .slice(0, 10);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -243,7 +255,7 @@ export default async function TeamsPage({
               losses={stats?.losses ?? 0}
               margin={stats?.margin ?? 0}
               fg={fg}
-              clutch={stats?.clutchMakes ?? 0}
+              trackedShots={stats?.trackedAttempts ?? 0}
               pulled={stats?.pulledCups ?? 0}
               weekly={stats?.weekNet ?? []}
               roster={team.rosters.map((r) => ({ id: r.player.id, name: r.player.name }))}
@@ -292,14 +304,15 @@ export default async function TeamsPage({
             />
           ))}
         </CollapsibleCard>
-        <CollapsibleCard title="Clutch teams" subtitle="Makes with 20 or fewer cups remaining (tracked only).">
+        <CollapsibleCard title="Clutch teams" subtitle="FG% with 20 or fewer cups remaining (tracked only).">
           {topClutch.length === 0 && <p className="text-sm text-ash">No data yet.</p>}
           {topClutch.map((row) => (
             <BarRow
               key={row.id}
-              label={row.name}
-              value={row.clutchMakes}
-              max={maxFrom(list, (t) => t.clutchMakes)}
+              label={`${row.name} (${row.clutchAttempts} att)`}
+              value={Number(((row.clutchMakes / row.clutchAttempts) * 100).toFixed(1))}
+              max={100}
+              suffix="%"
             />
           ))}
         </CollapsibleCard>
