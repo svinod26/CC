@@ -34,7 +34,7 @@ export default async function SignInPage() {
           <p className="text-xs uppercase tracking-[0.2em] text-garnet-600">Need access?</p>
           <h2 className="mt-2 text-2xl font-bold text-ink">Email me a password</h2>
           <p className="text-sm text-ash">
-            Enter your email. If we recognize it, we match you instantly. If not, add your name and we still provision access.
+            Enter the exact email from the roster mapping and we’ll send a login password.
           </p>
         </div>
         <div className="mt-4">

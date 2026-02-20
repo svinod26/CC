@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 export function RequestAccessForm() {
   const router = useRouter();
   const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
   const [lookupStatus, setLookupStatus] = useState<'idle' | 'loading' | 'found' | 'missing'>('idle');
+  const [mappedName, setMappedName] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -27,12 +27,14 @@ export function RequestAccessForm() {
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data?.found) {
-          setName(data?.name ?? '');
+          setMappedName(data?.name ?? '');
           setLookupStatus('found');
           return;
         }
+        setMappedName('');
         setLookupStatus('missing');
       } catch {
+        setMappedName('');
         setLookupStatus('missing');
       }
     }, 300);
@@ -48,7 +50,7 @@ export function RequestAccessForm() {
       const res = await fetch('/api/auth/request-access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name: name.trim() || undefined })
+        body: JSON.stringify({ email })
       });
 
       if (res.ok) {
@@ -71,8 +73,6 @@ export function RequestAccessForm() {
       setMessage('Network error. Please try again.');
     }
   };
-
-  const needsName = lookupStatus === 'missing';
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
@@ -109,27 +109,18 @@ export function RequestAccessForm() {
 
       {lookupStatus === 'found' && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-700">
-          Matched roster entry: <span className="font-semibold">{name}</span>
+          Matched roster entry: <span className="font-semibold">{mappedName}</span>
         </div>
       )}
 
-      {needsName && (
-        <label className="block space-y-1 text-sm">
-          <span className="text-ink">Name</span>
-          <input
-            className="w-full"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Your full name"
-            required
-          />
-          <span className="text-xs text-ash">No roster match found, so this is required.</span>
-        </label>
+      {lookupStatus === 'missing' && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-700">
+          Email not found in roster mapping. Use the exact email on file with the commissioner.
+        </div>
       )}
 
       <button
-        disabled={status === 'loading'}
+        disabled={status === 'loading' || lookupStatus === 'missing'}
         className="w-full rounded-full border border-garnet-200 bg-white/90 px-5 py-3 text-base font-semibold text-garnet-700 shadow hover:bg-gold-100 disabled:opacity-50"
         type="submit"
       >

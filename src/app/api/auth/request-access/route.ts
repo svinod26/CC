@@ -7,8 +7,7 @@ import { loadEmailMapping } from '@/lib/email-mapping';
 import { sendResendEmail } from '@/lib/resend';
 
 const requestSchema = z.object({
-  email: z.string().email(),
-  name: z.string().trim().min(1).max(120).optional()
+  email: z.string().email()
 });
 
 const generatePassword = () => randomBytes(9).toString('base64url');
@@ -26,12 +25,12 @@ export async function POST(req: Request) {
   const email = parsed.data.email.trim().toLowerCase();
   const mapping = loadEmailMapping();
   const entry = mapping.get(email);
-  const resolvedName = entry?.name ?? parsed.data.name?.trim();
+  const resolvedName = entry?.name;
 
   if (!resolvedName) {
     return NextResponse.json(
-      { error: 'Email not found in roster. Enter your name so we can create your account.' },
-      { status: 400 }
+      { error: 'Email not found in roster mapping. Use the email listed by the commissioner.' },
+      { status: 404 }
     );
   }
 

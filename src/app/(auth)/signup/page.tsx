@@ -19,7 +19,7 @@ export default async function SignUpPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-garnet-600">Get started</p>
         <h1 className="mt-2 text-3xl font-bold text-ink">Get your login password</h1>
         <p className="mt-2 text-sm text-ash">
-          Enter your email. If it matches the roster, we send a password immediately. If it does not, add your name and we still create access.
+          Enter the exact email from the roster mapping and we’ll send your password.
         </p>
         <p className="text-sm text-ash">
           Already have an account?{' '}
