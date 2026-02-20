@@ -29,6 +29,9 @@ const canonicalizeEmail = (value: string) => {
 };
 const require = createRequire(import.meta.url);
 const XLSX = require('xlsx');
+if (typeof XLSX.set_fs === 'function') {
+  XLSX.set_fs(fs);
+}
 
 let cached: { map: Map<string, MappingEntry>; mtimeMs: number } | null = null;
 

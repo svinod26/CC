@@ -38,23 +38,37 @@ export async function POST(req: Request) {
   const email = parsed.data.email.trim().toLowerCase();
   const canonicalEmail = canonicalizeEmail(email);
   let resolvedName: string | null = null;
+  let mappedEmail: string | null = null;
   try {
     const mapping = loadEmailMapping();
     const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
     resolvedName = entry?.name ?? null;
+    mappedEmail = entry?.email?.toLowerCase?.() ?? null;
   } catch (error) {
     console.error('Email mapping load failed; falling back to database lookup', error);
   }
+  const accountEmail = mappedEmail ?? email;
+  const candidateEmailSet = new Set([email, canonicalEmail, accountEmail, canonicalizeEmail(accountEmail)]);
+  const candidateEmailList = Array.from(candidateEmailSet);
+
   if (!resolvedName) {
     const playerByEmail = await prisma.player.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
+      where: {
+        OR: candidateEmailList.map((candidate) => ({
+          email: { equals: candidate, mode: 'insensitive' }
+        }))
+      },
       select: { name: true }
     });
     resolvedName = playerByEmail?.name ?? null;
   }
   if (!resolvedName) {
-    const userByEmail = await prisma.user.findUnique({
-      where: { email },
+    const userByEmail = await prisma.user.findFirst({
+      where: {
+        OR: candidateEmailList.map((candidate) => ({
+          email: { equals: candidate, mode: 'insensitive' }
+        }))
+      },
       select: { name: true }
     });
     resolvedName = userByEmail?.name ?? null;
@@ -75,7 +89,7 @@ export async function POST(req: Request) {
 
 Your Century Cup account is ready.
 
-Login: ${email}
+Login: ${accountEmail}
 Password: ${password}
 
 Sign in: ${appUrl}/signin
@@ -87,14 +101,14 @@ You can request a new password anytime from ${appUrl}/signup.`;
       <h2 style="margin:0 0 12px;">Century Cup login details</h2>
       <p>Hey ${resolvedName},</p>
       <p>Your Century Cup account is ready.</p>
-      <p><strong>Login:</strong> ${email}<br/>
+      <p><strong>Login:</strong> ${accountEmail}<br/>
          <strong>Password:</strong> ${password}</p>
       <p><a href="${appUrl}/signin">Sign in here</a></p>
     </div>
   `;
 
   try {
-    await sendResendEmail({ to: email, subject, html, text });
+    await sendResendEmail({ to: accountEmail, subject, html, text });
   } catch (error) {
     console.error('Request access email send failed', error);
     return NextResponse.json({ error: 'Email delivery failed. Please try again in a minute.' }, { status: 502 });
@@ -102,11 +116,18 @@ You can request a new password anytime from ${appUrl}/signup.`;
 
   try {
     await prisma.$transaction(async (tx) => {
-      const existing = await tx.user.findUnique({ where: { email } });
-      if (existing) {
+      const existingUser = await tx.user.findFirst({
+        where: {
+          OR: candidateEmailList.map((candidate) => ({
+            email: { equals: candidate, mode: 'insensitive' }
+          }))
+        }
+      });
+      if (existingUser) {
         await tx.user.update({
-          where: { id: existing.id },
+          where: { id: existingUser.id },
           data: {
+            email: accountEmail,
             passwordHash,
             name: resolvedName
           }
@@ -114,7 +135,7 @@ You can request a new password anytime from ${appUrl}/signup.`;
       } else {
         await tx.user.create({
           data: {
-            email,
+            email: accountEmail,
             name: resolvedName,
             passwordHash,
             role: 'USER'
@@ -122,16 +143,22 @@ You can request a new password anytime from ${appUrl}/signup.`;
         });
       }
 
-      const player = await tx.player.findFirst({ where: { email } });
+      const player = await tx.player.findFirst({
+        where: {
+          OR: candidateEmailList.map((candidate) => ({
+            email: { equals: candidate, mode: 'insensitive' }
+          }))
+        }
+      });
       if (!player) {
         const byName = await tx.player.findFirst({ where: { name: resolvedName } });
         if (byName && !byName.email) {
-          await tx.player.update({ where: { id: byName.id }, data: { email } });
+          await tx.player.update({ where: { id: byName.id }, data: { email: accountEmail } });
         } else if (!byName) {
           await tx.player.create({
             data: {
               name: resolvedName,
-              email
+              email: accountEmail
             }
           });
         }
@@ -145,5 +172,5 @@ You can request a new password anytime from ${appUrl}/signup.`;
     );
   }
 
-  return NextResponse.json({ ok: true, redirectTo: `/signin?passwordSent=1&email=${encodeURIComponent(email)}` });
+  return NextResponse.json({ ok: true, redirectTo: `/signin?passwordSent=1&email=${encodeURIComponent(accountEmail)}` });
 }

@@ -32,6 +32,7 @@ export async function POST(req: Request) {
 
   const email = parsed.data.email.trim().toLowerCase();
   const canonicalEmail = canonicalizeEmail(email);
+  const candidateEmails = canonicalEmail === email ? [email] : [email, canonicalEmail];
   try {
     const mapping = loadEmailMapping();
     const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
@@ -43,15 +44,23 @@ export async function POST(req: Request) {
   }
 
   const player = await prisma.player.findFirst({
-    where: { email: { equals: email, mode: 'insensitive' } },
+    where: {
+      OR: candidateEmails.map((candidate) => ({
+        email: { equals: candidate, mode: 'insensitive' }
+      }))
+    },
     select: { name: true }
   });
   if (player?.name) {
     return NextResponse.json({ found: true, name: player.name });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: candidateEmails.map((candidate) => ({
+        email: { equals: candidate, mode: 'insensitive' }
+      }))
+    },
     select: { name: true }
   });
   if (user?.name) {
