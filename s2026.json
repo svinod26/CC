@@ -897,11 +897,8 @@
             "misses": null
           }
         ]
-      }
-    },
-    {
-      "match_id": "Week 2_3",
-      "team1": {
+      },
+      "team2": {
         "name": "Candice?",
         "result": "Win",
         "margin": 1,
@@ -997,8 +994,11 @@
             "misses": null
           }
         ]
-      },
-      "team2": {
+      }
+    },
+    {
+      "match_id": "Week 2_3",
+      "team1": {
         "name": "Team C",
         "result": "Loss",
         "margin": -1,
@@ -1094,11 +1094,8 @@
             "misses": null
           }
         ]
-      }
-    },
-    {
-      "match_id": "Week 2_4",
-      "team1": {
+      },
+      "team2": {
         "name": "Team E",
         "result": "Win",
         "margin": 1,
@@ -1203,8 +1200,7 @@
             "misses": null
           }
         ]
-      },
-      "team2": null
+      }
     }
   ],
   "Week 3": [
@@ -1605,103 +1601,6 @@
     {
       "match_id": "Week 3_3",
       "team1": {
-        "name": "Team F",
-        "result": "Win",
-        "margin": 4,
-        "players": [
-          {
-            "name": "Steven",
-            "total_cups": 15,
-            "tops": 5,
-            "top_isos": 1,
-            "bottoms": 7,
-            "bottom_isos": 2,
-            "misses": 31
-          },
-          {
-            "name": "Jay",
-            "total_cups": 21,
-            "tops": 7,
-            "top_isos": 1,
-            "bottoms": 9,
-            "bottom_isos": 4,
-            "misses": 28
-          },
-          {
-            "name": "Sam Yost",
-            "total_cups": 14,
-            "tops": 5,
-            "top_isos": 0,
-            "bottoms": 7,
-            "bottom_isos": 2,
-            "misses": 32
-          },
-          {
-            "name": "Somil",
-            "total_cups": 16,
-            "tops": 4,
-            "top_isos": 0,
-            "bottoms": 11,
-            "bottom_isos": 1,
-            "misses": 29
-          },
-          {
-            "name": "Adi",
-            "total_cups": 14,
-            "tops": 8,
-            "top_isos": 2,
-            "bottoms": 4,
-            "bottom_isos": 0,
-            "misses": 30
-          },
-          {
-            "name": "Parker",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Ted",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Henry",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Will He",
-            "total_cups": 19,
-            "tops": 10,
-            "top_isos": 0,
-            "bottoms": 8,
-            "bottom_isos": 1,
-            "misses": 28
-          },
-          {
-            "name": "Zane Borkar",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          }
-        ]
-      },
-      "team2": {
         "name": "Team E",
         "result": "Loss",
         "margin": -4,
@@ -1798,6 +1697,103 @@
           },
           {
             "name": "Ayush",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          }
+        ]
+      },
+      "team2": {
+        "name": "Team F",
+        "result": "Win",
+        "margin": 4,
+        "players": [
+          {
+            "name": "Steven",
+            "total_cups": 15,
+            "tops": 5,
+            "top_isos": 1,
+            "bottoms": 7,
+            "bottom_isos": 2,
+            "misses": 31
+          },
+          {
+            "name": "Jay",
+            "total_cups": 21,
+            "tops": 7,
+            "top_isos": 1,
+            "bottoms": 9,
+            "bottom_isos": 4,
+            "misses": 28
+          },
+          {
+            "name": "Sam Yost",
+            "total_cups": 14,
+            "tops": 5,
+            "top_isos": 0,
+            "bottoms": 7,
+            "bottom_isos": 2,
+            "misses": 32
+          },
+          {
+            "name": "Somil",
+            "total_cups": 16,
+            "tops": 4,
+            "top_isos": 0,
+            "bottoms": 11,
+            "bottom_isos": 1,
+            "misses": 29
+          },
+          {
+            "name": "Adi",
+            "total_cups": 14,
+            "tops": 8,
+            "top_isos": 2,
+            "bottoms": 4,
+            "bottom_isos": 0,
+            "misses": 30
+          },
+          {
+            "name": "Parker",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          },
+          {
+            "name": "Ted",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          },
+          {
+            "name": "Henry",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          },
+          {
+            "name": "Will He",
+            "total_cups": 19,
+            "tops": 10,
+            "top_isos": 0,
+            "bottoms": 8,
+            "bottom_isos": 1,
+            "misses": 28
+          },
+          {
+            "name": "Zane Borkar",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2010,6 +2006,103 @@
     {
       "match_id": "Week 4_2",
       "team1": {
+        "name": "Team F",
+        "result": "Loss",
+        "margin": -6,
+        "players": [
+          {
+            "name": "Steven",
+            "total_cups": 14,
+            "tops": 10,
+            "top_isos": 0,
+            "bottoms": 4,
+            "bottom_isos": 0,
+            "misses": 25
+          },
+          {
+            "name": "Jay",
+            "total_cups": 15,
+            "tops": 4,
+            "top_isos": 4,
+            "bottoms": 7,
+            "bottom_isos": 0,
+            "misses": 25
+          },
+          {
+            "name": "Sam Yost",
+            "total_cups": 15,
+            "tops": 7,
+            "top_isos": 1,
+            "bottoms": 7,
+            "bottom_isos": 0,
+            "misses": 24
+          },
+          {
+            "name": "Somil",
+            "total_cups": 22,
+            "tops": 3,
+            "top_isos": 0,
+            "bottoms": 17,
+            "bottom_isos": 2,
+            "misses": 23
+          },
+          {
+            "name": "Adi",
+            "total_cups": 10,
+            "tops": 6,
+            "top_isos": 2,
+            "bottoms": 2,
+            "bottom_isos": 0,
+            "misses": 27
+          },
+          {
+            "name": "Parker",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          },
+          {
+            "name": "Ted",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          },
+          {
+            "name": "Henry",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          },
+          {
+            "name": "Will He",
+            "total_cups": 14,
+            "tops": 7,
+            "top_isos": 0,
+            "bottoms": 7,
+            "bottom_isos": 0,
+            "misses": 24
+          },
+          {
+            "name": "Zane Borkar",
+            "total_cups": null,
+            "tops": null,
+            "top_isos": null,
+            "bottoms": null,
+            "bottom_isos": null,
+            "misses": null
+          }
+        ]
+      },
+      "team2": {
         "name": "Team C",
         "result": "Win",
         "margin": 6,
@@ -2105,205 +2198,11 @@
             "misses": null
           }
         ]
-      },
-      "team2": {
-        "name": "Team F",
-        "result": "Loss",
-        "margin": -6,
-        "players": [
-          {
-            "name": "Steven",
-            "total_cups": 14,
-            "tops": 2,
-            "top_isos": 0,
-            "bottoms": 12,
-            "bottom_isos": 0,
-            "misses": 27
-          },
-          {
-            "name": "Jay",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Sam Yost",
-            "total_cups": 14,
-            "tops": 8,
-            "top_isos": 1,
-            "bottoms": 5,
-            "bottom_isos": 0,
-            "misses": 29
-          },
-          {
-            "name": "Somil",
-            "total_cups": 23,
-            "tops": 1,
-            "top_isos": 0,
-            "bottoms": 20,
-            "bottom_isos": 2,
-            "misses": 26
-          },
-          {
-            "name": "Adi",
-            "total_cups": 20,
-            "tops": 10,
-            "top_isos": 4,
-            "bottoms": 6,
-            "bottom_isos": 0,
-            "misses": 23
-          },
-          {
-            "name": "Parker",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Ted",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Henry",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Will He",
-            "total_cups": 23,
-            "tops": 7,
-            "top_isos": 0,
-            "bottoms": 14,
-            "bottom_isos": 2,
-            "misses": 27
-          },
-          {
-            "name": "Zane Borkar",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          }
-        ]
       }
     },
     {
       "match_id": "Week 4_3",
       "team1": {
-        "name": "Gargantuan",
-        "result": "Win",
-        "margin": 18,
-        "players": [
-          {
-            "name": "Porco",
-            "total_cups": 20,
-            "tops": 9,
-            "top_isos": 0,
-            "bottoms": 9,
-            "bottom_isos": 2,
-            "misses": 23
-          },
-          {
-            "name": "Fritz",
-            "total_cups": 26,
-            "tops": 10,
-            "top_isos": 7,
-            "bottoms": 5,
-            "bottom_isos": 4,
-            "misses": 20
-          },
-          {
-            "name": "Sebastian F",
-            "total_cups": 15,
-            "tops": 9,
-            "top_isos": 1,
-            "bottoms": 4,
-            "bottom_isos": 1,
-            "misses": 21
-          },
-          {
-            "name": "TC",
-            "total_cups": 14,
-            "tops": 3,
-            "top_isos": 0,
-            "bottoms": 11,
-            "bottom_isos": 0,
-            "misses": 21
-          },
-          {
-            "name": "Kento",
-            "total_cups": 18,
-            "tops": 5,
-            "top_isos": 0,
-            "bottoms": 10,
-            "bottom_isos": 3,
-            "misses": 21
-          },
-          {
-            "name": "Jacob Ryan",
-            "total_cups": 8,
-            "tops": 1,
-            "top_isos": 0,
-            "bottoms": 7,
-            "bottom_isos": 0,
-            "misses": 23
-          },
-          {
-            "name": "Chubbs",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Will Blankenship",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Ilt",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Liam Johnston",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          }
-        ]
-      },
-      "team2": {
         "name": "Team E",
         "result": "Loss",
         "margin": -18,
@@ -2408,64 +2307,68 @@
             "misses": null
           }
         ]
-      }
-    }
-  ],
-  "Week 5": [
-    {
-      "match_id": "Week 5_1",
-      "team1": {
-        "name": "Team F",
+      },
+      "team2": {
+        "name": "Gargantuan",
         "result": "Win",
-        "margin": 5,
+        "margin": 18,
         "players": [
           {
-            "name": "Steven",
-            "total_cups": 18,
-            "tops": 10,
-            "top_isos": 2,
-            "bottoms": 4,
+            "name": "Porco",
+            "total_cups": 20,
+            "tops": 9,
+            "top_isos": 0,
+            "bottoms": 9,
             "bottom_isos": 2,
-            "misses": 27
+            "misses": 23
           },
           {
-            "name": "Jay",
+            "name": "Fritz",
+            "total_cups": 26,
+            "tops": 10,
+            "top_isos": 7,
+            "bottoms": 5,
+            "bottom_isos": 4,
+            "misses": 20
+          },
+          {
+            "name": "Sebastian F",
             "total_cups": 15,
-            "tops": 8,
+            "tops": 9,
             "top_isos": 1,
-            "bottoms": 3,
-            "bottom_isos": 3,
-            "misses": 28
-          },
-          {
-            "name": "Sam Yost",
-            "total_cups": 13,
-            "tops": 7,
-            "top_isos": 2,
-            "bottoms": 3,
+            "bottoms": 4,
             "bottom_isos": 1,
-            "misses": 25
+            "misses": 21
           },
           {
-            "name": "Somil",
-            "total_cups": 22,
+            "name": "TC",
+            "total_cups": 14,
+            "tops": 3,
+            "top_isos": 0,
+            "bottoms": 11,
+            "bottom_isos": 0,
+            "misses": 21
+          },
+          {
+            "name": "Kento",
+            "total_cups": 18,
+            "tops": 5,
+            "top_isos": 0,
+            "bottoms": 10,
+            "bottom_isos": 3,
+            "misses": 21
+          },
+          {
+            "name": "Jacob Ryan",
+            "total_cups": 8,
             "tops": 1,
             "top_isos": 0,
-            "bottoms": 20,
-            "bottom_isos": 1,
-            "misses": 22
-          },
-          {
-            "name": "Adi",
-            "total_cups": 16,
-            "tops": 8,
-            "top_isos": 0,
-            "bottoms": 8,
+            "bottoms": 7,
             "bottom_isos": 0,
-            "misses": 27
+            "misses": 23
           },
           {
-            "name": "Parker",
+            "name": "Chubbs",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2474,7 +2377,7 @@
             "misses": null
           },
           {
-            "name": "Ted",
+            "name": "Will Blankenship",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2483,7 +2386,7 @@
             "misses": null
           },
           {
-            "name": "Henry",
+            "name": "Ilt",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2492,16 +2395,7 @@
             "misses": null
           },
           {
-            "name": "Will He",
-            "total_cups": 16,
-            "tops": 4,
-            "top_isos": 2,
-            "bottoms": 9,
-            "bottom_isos": 1,
-            "misses": 25
-          },
-          {
-            "name": "Zane Borkar",
+            "name": "Liam Johnston",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2510,8 +2404,13 @@
             "misses": null
           }
         ]
-      },
-      "team2": {
+      }
+    }
+  ],
+  "Week 5": [
+    {
+      "match_id": "Week 5_1",
+      "team1": {
         "name": "Migos",
         "result": "Loss",
         "margin": -5,
@@ -2607,114 +2506,59 @@
             "misses": null
           }
         ]
-      }
-    },
-    {
-      "match_id": "Week 5_2",
-      "team1": {
-        "name": "Gargantuan",
-        "result": null,
-        "margin": null,
-        "players": [
-          {
-            "name": "Porco",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Fritz",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Sebastian F",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "TC",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Kento",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Jacob Ryan",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Chubbs",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Will Blankenship",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Ilt",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Liam Johnston",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          }
-        ]
       },
       "team2": {
-        "name": "Candice?",
-        "result": null,
-        "margin": null,
+        "name": "Team F",
+        "result": "Win",
+        "margin": 5,
         "players": [
           {
-            "name": "John",
+            "name": "Steven",
+            "total_cups": 18,
+            "tops": 10,
+            "top_isos": 2,
+            "bottoms": 4,
+            "bottom_isos": 2,
+            "misses": 27
+          },
+          {
+            "name": "Jay",
+            "total_cups": 15,
+            "tops": 8,
+            "top_isos": 1,
+            "bottoms": 3,
+            "bottom_isos": 3,
+            "misses": 28
+          },
+          {
+            "name": "Sam Yost",
+            "total_cups": 13,
+            "tops": 7,
+            "top_isos": 2,
+            "bottoms": 3,
+            "bottom_isos": 1,
+            "misses": 25
+          },
+          {
+            "name": "Somil",
+            "total_cups": 22,
+            "tops": 1,
+            "top_isos": 0,
+            "bottoms": 20,
+            "bottom_isos": 1,
+            "misses": 22
+          },
+          {
+            "name": "Adi",
+            "total_cups": 16,
+            "tops": 8,
+            "top_isos": 0,
+            "bottoms": 8,
+            "bottom_isos": 0,
+            "misses": 27
+          },
+          {
+            "name": "Parker",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2723,7 +2567,7 @@
             "misses": null
           },
           {
-            "name": "Cole",
+            "name": "Ted",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2732,7 +2576,7 @@
             "misses": null
           },
           {
-            "name": "Vishal",
+            "name": "Henry",
             "total_cups": null,
             "tops": null,
             "top_isos": null,
@@ -2741,267 +2585,16 @@
             "misses": null
           },
           {
-            "name": "Ram",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
+            "name": "Will He",
+            "total_cups": 16,
+            "tops": 4,
+            "top_isos": 2,
+            "bottoms": 9,
+            "bottom_isos": 1,
+            "misses": 25
           },
           {
-            "name": "Hershey",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Neo",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Luebke",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Tyler",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Gio",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Owen Danganan",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          }
-        ]
-      }
-    },
-    {
-      "match_id": "Week 5_3",
-      "team1": {
-        "name": "Team C",
-        "result": null,
-        "margin": null,
-        "players": [
-          {
-            "name": "Dannegger",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Kumba",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Dli",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Paul",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Matvey",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Haldar",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Dave",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Dji",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Jwu",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Jason Chan",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          }
-        ]
-      },
-      "team2": {
-        "name": "Team E",
-        "result": null,
-        "margin": null,
-        "players": [
-          {
-            "name": "Guel",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Pasha",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Lucas",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Eric",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Samos",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Raymond",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "David Cerrato",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Erik",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Gavin",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Jack Flori",
-            "total_cups": null,
-            "tops": null,
-            "top_isos": null,
-            "bottoms": null,
-            "bottom_isos": null,
-            "misses": null
-          },
-          {
-            "name": "Ayush",
+            "name": "Zane Borkar",
             "total_cups": null,
             "tops": null,
             "top_isos": null,

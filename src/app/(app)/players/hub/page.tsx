@@ -59,21 +59,24 @@ export default async function PlayerHubPage({
     _max: { week: true }
   });
   const weekCount = Math.max(maxWeekRow._max.week ?? 7, 7);
+  const gameWhere = {
+    ...(season ? { seasonId: season.id } : {}),
+    ...(typeFilter ? { type: typeFilter } : {})
+  };
+  const hasGameWhere = Object.keys(gameWhere).length > 0;
 
   const events = await prisma.shotEvent.findMany({
     where: {
       shooterId: { not: null },
       resultType: { notIn: ['PULL_HOME', 'PULL_AWAY'] },
-      ...(season ? { game: { seasonId: season.id } } : {}),
-      ...(typeFilter ? { game: { type: typeFilter } } : {})
+      ...(hasGameWhere ? { game: gameWhere } : {})
     },
     include: { shooter: true, game: { include: { scheduleEntry: true } } },
     orderBy: { timestamp: 'desc' }
   });
   const legacyStats = await prisma.legacyPlayerStat.findMany({
     where: {
-      ...(season ? { game: { seasonId: season.id } } : {}),
-      ...(typeFilter ? { game: { type: typeFilter } } : {})
+      ...(hasGameWhere ? { game: gameWhere } : {})
     },
     include: { player: true, game: { include: { scheduleEntry: true } } }
   });
@@ -220,7 +223,7 @@ export default async function PlayerHubPage({
 
   const sections = [
     {
-      title: 'Top total makes',
+      title: 'Most total makes',
       subtitle: 'Raw cup makes across the season.',
       rows: topBy('makes'),
       valueFor: (row: PlayerAgg) => row.makes,
