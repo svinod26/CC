@@ -12,9 +12,16 @@ type LiveGame = {
   homeTeam: { id: string; name: string } | null;
   awayTeam: { id: string; name: string } | null;
   state: { homeCupsRemaining: number; awayCupsRemaining: number } | null;
-  events: { resultType: ResultType; cupsDelta: number }[];
+  events: { resultType: ResultType; cupsDelta: number; offenseTeamId?: string | null }[];
   legacyTeamStats?: { teamId: string | null; pulledCups: number }[];
 };
+
+const makeResultTypes = new Set<ResultType>([
+  ResultType.TOP_REGULAR,
+  ResultType.TOP_ISO,
+  ResultType.BOTTOM_REGULAR,
+  ResultType.BOTTOM_ISO
+]);
 
 export function LiveScorebug({ gameId, initialData }: { gameId: string; initialData: LiveGame }) {
   const { data } = useSWR<LiveGame>(`/api/games/${gameId}/state`, fetcher, {
@@ -26,8 +33,24 @@ export function LiveScorebug({ gameId, initialData }: { gameId: string; initialD
 
   const homeRemaining = data.state?.homeCupsRemaining ?? 100;
   const awayRemaining = data.state?.awayCupsRemaining ?? 100;
-  const homeMade = Math.max(0, 100 - awayRemaining);
-  const awayMade = Math.max(0, 100 - homeRemaining);
+  const trackedMakesByTeam = data.events.reduce(
+    (acc, event) => {
+      if (!makeResultTypes.has(event.resultType) || !event.offenseTeamId) return acc;
+      if (event.offenseTeamId === data.homeTeam?.id) acc.home += 1;
+      if (event.offenseTeamId === data.awayTeam?.id) acc.away += 1;
+      return acc;
+    },
+    { home: 0, away: 0 }
+  );
+  const hasOffenseScopedMakes = trackedMakesByTeam.home + trackedMakesByTeam.away > 0;
+  const homeMade =
+    data.statsSource === StatsSource.TRACKED && hasOffenseScopedMakes
+      ? trackedMakesByTeam.home
+      : Math.max(0, 100 - awayRemaining);
+  const awayMade =
+    data.statsSource === StatsSource.TRACKED && hasOffenseScopedMakes
+      ? trackedMakesByTeam.away
+      : Math.max(0, 100 - homeRemaining);
   const winner = winnerFromRemaining(homeRemaining, awayRemaining, data.statsSource);
 
   const pulledHome = data.statsSource === 'LEGACY'
