@@ -16,6 +16,7 @@ type PlayerAgg = {
   id: string;
   name: string;
   games: number;
+  trackedGames: number;
   makes: number;
   attempts: number;
   trackedAttempts: number;
@@ -84,6 +85,7 @@ export default async function PlayerHubPage({
 
   const players = new Map<string, PlayerAgg>();
   const playerGameIds = new Map<string, Set<string>>();
+  const trackedGameIds = new Map<string, Set<string>>();
 
   for (const event of events) {
     if (!event.shooterId || !event.shooter) continue;
@@ -93,6 +95,7 @@ export default async function PlayerHubPage({
         id: event.shooterId,
         name: event.shooter.name ?? 'Unknown',
         games: 0,
+        trackedGames: 0,
         makes: 0,
         attempts: 0,
         trackedAttempts: 0,
@@ -112,6 +115,9 @@ export default async function PlayerHubPage({
       const gameSet = playerGameIds.get(event.shooterId) ?? new Set<string>();
       gameSet.add(eventGameId);
       playerGameIds.set(event.shooterId, gameSet);
+      const trackedSet = trackedGameIds.get(event.shooterId) ?? new Set<string>();
+      trackedSet.add(eventGameId);
+      trackedGameIds.set(event.shooterId, trackedSet);
     }
 
     if (isShot(event.resultType as any)) {
@@ -155,6 +161,7 @@ export default async function PlayerHubPage({
         id: stat.playerId,
         name: stat.player.name ?? 'Unknown',
         games: 0,
+        trackedGames: 0,
         makes: 0,
         attempts: 0,
         trackedAttempts: 0,
@@ -216,7 +223,9 @@ export default async function PlayerHubPage({
       : 0;
   list.forEach((row) => {
     const games = playerGameIds.get(row.id)?.size ?? 0;
+    const trackedGames = trackedGameIds.get(row.id)?.size ?? 0;
     row.games = games;
+    row.trackedGames = trackedGames;
     const adjustedFgm = games > 0 ? row.weightedPoints / games : 0;
     const fg = row.attempts ? row.makes / row.attempts : 0;
     const rating =
@@ -237,6 +246,7 @@ export default async function PlayerHubPage({
   const topIso = [...list]
     .sort((a, b) => b.topIsos + b.bottomIsos - (a.topIsos + a.bottomIsos))
     .slice(0, 20);
+  const topClutch = topBy('clutchMakes', 10).filter((row) => row.clutchMakes > 0);
 
   const sections = [
     {
@@ -325,15 +335,17 @@ export default async function PlayerHubPage({
       <section>
         <CollapsibleCard title="Clutch finishers" subtitle="Makes with 20 or fewer cups remaining (tracked only).">
           <div className="grid gap-3 md:grid-cols-2">
-            {topBy('clutchMakes', 10).map((row) => (
+            {topClutch.map((row) => (
               <div key={row.id} className="rounded-xl border border-garnet-100 bg-parchment/70 px-4 py-3 text-sm">
                 <p className="font-semibold text-ink">
                   <PlayerLink id={row.id} name={row.name} className="text-ink hover:text-garnet-600" />
                 </p>
-                <p className="text-garnet-600">{row.clutchMakes} clutch makes</p>
+                <p className="text-garnet-600">
+                  {row.clutchMakes} clutch makes · {row.trackedGames} tracked {row.trackedGames === 1 ? 'game' : 'games'}
+                </p>
               </div>
             ))}
-            {topBy('clutchMakes', 10).length === 0 && <p className="text-sm text-ash">No data yet.</p>}
+            {topClutch.length === 0 && <p className="text-sm text-ash">No data yet.</p>}
           </div>
         </CollapsibleCard>
       </section>

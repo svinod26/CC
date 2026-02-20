@@ -29,7 +29,9 @@ type PlayerImpact = {
   name: string;
   makes: number;
   attempts: number;
+  trackedAttempts: number;
   weightedPoints: number;
+  tempoPoints: number;
 };
 
 export default async function TeamPage({ params }: { params: { id: string } }) {
@@ -45,7 +47,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
 
   if (!team) return notFound();
 
-  const games = await prisma.game.findMany({
+  const gamesRaw = await prisma.game.findMany({
     where: { OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] },
     orderBy: { startedAt: 'desc' },
     include: {
@@ -57,6 +59,12 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
       legacyStats: true,
       legacyTeamStats: true
     }
+  });
+  const games = [...gamesRaw].sort((a, b) => {
+    const weekA = a.scheduleEntry?.week ?? -1;
+    const weekB = b.scheduleEntry?.week ?? -1;
+    if (weekA !== weekB) return weekB - weekA;
+    return b.startedAt.getTime() - a.startedAt.getTime();
   });
 
   const pullEvents = await prisma.shotEvent.findMany({
@@ -80,7 +88,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
   const weekCount = Math.max(maxWeekRow._max.week ?? 7, 7);
   const weeklyMakes = new Array(weekCount).fill(0);
   const playerImpact = new Map<string, PlayerImpact>();
-  let teamTempoRating = 0;
+  const playerGameIds = new Map<string, Set<string>>();
 
   for (const game of games) {
     if (game.statsSource === 'LEGACY') {
@@ -105,8 +113,13 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
           name: playerNameById.get(stat.playerId) ?? 'Unknown',
           makes: 0,
           attempts: 0,
-          weightedPoints: 0
+          trackedAttempts: 0,
+          weightedPoints: 0,
+          tempoPoints: 0
         };
+        const gameSet = playerGameIds.get(stat.playerId) ?? new Set<string>();
+        gameSet.add(game.id);
+        playerGameIds.set(stat.playerId, gameSet);
         current.makes += makes;
         current.attempts += attempts;
         current.weightedPoints += weightedPoints;
@@ -131,13 +144,19 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
         name: playerNameById.get(event.shooterId) ?? 'Unknown',
         makes: 0,
         attempts: 0,
-        weightedPoints: 0
+        trackedAttempts: 0,
+        weightedPoints: 0,
+        tempoPoints: 0
       };
+      const gameSet = playerGameIds.get(event.shooterId) ?? new Set<string>();
+      gameSet.add(game.id);
+      playerGameIds.set(event.shooterId, gameSet);
       current.attempts += 1;
+      current.trackedAttempts += 1;
       if (isMake(event.resultType)) {
         current.makes += 1;
         current.weightedPoints += weightFor(event.resultType);
-        teamTempoRating += tempoWeightFor(event.remainingCupsBefore ?? 100, event.resultType);
+        current.tempoPoints += tempoWeightFor(event.remainingCupsBefore ?? 100, event.resultType);
       }
       playerImpact.set(event.shooterId, current);
     }
@@ -147,7 +166,24 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
 
   const impacts = Array.from(playerImpact.values()).sort((a, b) => b.weightedPoints - a.weightedPoints);
   const topImpacts = impacts;
-  const teamRating = impacts.reduce((sum, row) => sum + row.weightedPoints, 0);
+  const shootersWithAttempts = impacts.filter((row) => row.attempts > 0);
+  const avgPlayerFg =
+    shootersWithAttempts.length > 0
+      ? shootersWithAttempts.reduce((sum, row) => sum + row.makes / row.attempts, 0) / shootersWithAttempts.length
+      : null;
+  const avgAdjustedPerGame =
+    shootersWithAttempts.length > 0
+      ? shootersWithAttempts.reduce((sum, row) => {
+          const gamesForPlayer = playerGameIds.get(row.id)?.size ?? 0;
+          const adjustedPerGame = gamesForPlayer > 0 ? row.weightedPoints / gamesForPlayer : 0;
+          return sum + adjustedPerGame;
+        }, 0) / shootersWithAttempts.length
+      : null;
+  const tempoShooters = impacts.filter((row) => row.trackedAttempts > 0);
+  const avgTempoPerShot =
+    tempoShooters.length > 0
+      ? tempoShooters.reduce((sum, row) => sum + row.tempoPoints / row.trackedAttempts, 0) / tempoShooters.length
+      : null;
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -181,11 +217,15 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
         <InfoCard label="Weeks tracked" value={weeklyMakes.filter((v) => v > 0).length} />
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2">
-        <InfoCard label="Team rating" value={Number(teamRating.toFixed(2))} />
+      <section className="grid gap-3 md:grid-cols-3">
+        <InfoCard label="Avg player FG%" value={avgPlayerFg !== null ? `${(avgPlayerFg * 100).toFixed(1)}%` : '—'} />
         <InfoCard
-          label="Tempo rating (tracked)"
-          value={teamTempoRating > 0 ? Number(teamTempoRating.toFixed(2)) : '—'}
+          label="Avg adjusted FGM / player-game"
+          value={avgAdjustedPerGame !== null ? avgAdjustedPerGame.toFixed(2) : '—'}
+        />
+        <InfoCard
+          label="Avg tempo / tracked shot"
+          value={avgTempoPerShot !== null ? avgTempoPerShot.toFixed(2) : '—'}
         />
       </section>
 

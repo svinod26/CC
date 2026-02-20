@@ -220,9 +220,9 @@ export default async function GamePage({ params }: { params: { id: string } }) {
               {startedLabel} · {game.status}
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="w-full lg:w-auto">
             {isLegacy ? (
-              <>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <TeamScoreCard
                   label={game.homeTeam?.name ?? 'Home'}
                   made={homeMade}
@@ -237,7 +237,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
                   pulled={pulledAway}
                   result={awayWon ? 'W' : homeWon ? 'L' : ''}
                 />
-              </>
+              </div>
             ) : (
               <LiveScorebug
                 gameId={game.id}
@@ -315,7 +315,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
       {!isLegacy && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-garnet-100 bg-white/80 p-4">
+          <div className="min-w-0 rounded-xl border border-garnet-100 bg-white/80 p-4">
             <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-base font-semibold text-ink sm:text-lg">Advanced</h2>
               <p className="max-w-full text-[11px] text-ash sm:max-w-[260px] sm:text-xs sm:text-right">
@@ -365,7 +365,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-garnet-100 bg-white/80 p-4">
+          <div className="min-w-0 rounded-xl border border-garnet-100 bg-white/80 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-ink sm:text-lg">Play-by-play</h2>
               <p className="text-xs text-ash">Tap undo in console to remove last event</p>
@@ -451,9 +451,9 @@ function TeamScoreCard({
         : 'border-garnet-100 bg-parchment/70 text-ink';
 
   return (
-    <div className={`min-w-[160px] rounded-xl border px-4 py-3 ${resultStyles}`}>
+    <div className={`w-full min-w-0 rounded-xl border px-4 py-3 sm:min-w-[160px] ${resultStyles}`}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">{label}</p>
+        <p className="truncate text-sm font-semibold">{label}</p>
       </div>
       <div className="mt-2 text-xs uppercase text-ash">Cups made</div>
       <div className="text-2xl font-bold text-ink">{made}</div>

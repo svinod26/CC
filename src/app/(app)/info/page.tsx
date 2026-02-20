@@ -29,8 +29,9 @@ export default function InfoPage() {
               <span className="font-semibold text-ink">Rating / shot</span>: player rating ÷ total attempts.
             </li>
             <li>
-              <span className="font-semibold text-ink">Tempo rating (tracked)</span>: player rating × temporal multiplier
-              per make, where temporal = {`1 + alpha * (1 - remaining/100)^p`} with alpha=0.5, p=2.
+              <span className="font-semibold text-ink">Tempo rating (tracked)</span>: sum of
+              (Adjusted FGM make weight × temporal multiplier) across tracked makes, where temporal ={' '}
+              {`1 + alpha * (1 - remaining/100)^p`} with alpha=0.5, p=2.
             </li>
             <li>
               <span className="font-semibold text-ink">Clutch share (tracked)</span>: makes with ≤20 cups remaining ÷
@@ -57,11 +58,8 @@ export default function InfoPage() {
         <h2 className="text-lg font-semibold text-ink">Team metrics</h2>
         <ul className="mt-3 space-y-2 text-sm text-ash">
           <li>
-            <span className="font-semibold text-ink">Team rating</span>: sum of player ratings from all team games.
-          </li>
-          <li>
-            <span className="font-semibold text-ink">Team tempo rating (tracked)</span>: sum of tempo ratings from all
-            tracked makes.
+            <span className="font-semibold text-ink">Team hub</span>: emphasizes margin, FG%, ISO volume, and
+            clutch FG% (≤20 cups remaining) from tracked data.
           </li>
         </ul>
       </section>

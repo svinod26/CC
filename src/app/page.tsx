@@ -119,7 +119,7 @@ export default async function HomePage() {
       ])
     : [[], []];
 
-  const recentPlayerGames = player
+  const recentPlayerGamesRaw = player
     ? await prisma.game.findMany({
         where: {
           OR: [
@@ -133,11 +133,20 @@ export default async function HomePage() {
         include: {
           homeTeam: true,
           awayTeam: true,
+          scheduleEntry: true,
           events: { where: { shooterId: player.id }, orderBy: { timestamp: 'asc' } },
           legacyStats: { where: { playerId: player.id } }
         }
       })
     : [];
+  const recentPlayerGames = [...recentPlayerGamesRaw]
+    .sort((a, b) => {
+      const weekA = a.scheduleEntry?.week ?? -1;
+      const weekB = b.scheduleEntry?.week ?? -1;
+      if (weekA !== weekB) return weekB - weekA;
+      return b.startedAt.getTime() - a.startedAt.getTime();
+    })
+    .slice(0, 5);
 
   const topPerformers = new Map<
     string,
@@ -214,8 +223,6 @@ export default async function HomePage() {
       ? [...weeklyMargins].sort((a, b) => a.margin - b.margin || a.home.localeCompare(b.home))[0]
       : null;
 
-  let topMakes = 0;
-  let bottomMakes = 0;
   let isoMakes = 0;
   let totalMakes = 0;
   let totalAttempts = 0;
@@ -230,8 +237,6 @@ export default async function HomePage() {
     if (!isMake(event.resultType)) return;
     totalMakes += 1;
     if (isClutchShot) clutchMakes += 1;
-    if (event.resultType === ResultType.TOP_REGULAR || event.resultType === ResultType.TOP_ISO) topMakes += 1;
-    if (event.resultType === ResultType.BOTTOM_REGULAR || event.resultType === ResultType.BOTTOM_ISO) bottomMakes += 1;
     if (event.resultType === ResultType.TOP_ISO || event.resultType === ResultType.BOTTOM_ISO) isoMakes += 1;
   });
 
@@ -241,20 +246,18 @@ export default async function HomePage() {
     const breakdown = legacyTop + legacyBottom;
     const makes = stat.totalCups > 0 ? stat.totalCups : breakdown;
     const attempts = makes + stat.misses;
-    topMakes += legacyTop;
-    bottomMakes += legacyBottom;
     isoMakes += stat.topIso + stat.bottomIso;
     totalMakes += makes;
     totalAttempts += attempts;
   });
 
-  const topShare = totalMakes > 0 ? topMakes / totalMakes : null;
   const isoShare = totalMakes > 0 ? isoMakes / totalMakes : null;
   const clutchFg = clutchAttempts > 0 ? clutchMakes / clutchAttempts : null;
   const pace = latestWeekGames.length > 0 ? totalAttempts / latestWeekGames.length : null;
+  const makesPerGame = latestWeekGames.length > 0 ? totalMakes / latestWeekGames.length : null;
   const weeklyIntel = [
     {
-      label: 'Parity check',
+      label: 'Competitive balance',
       value:
         weeklyMargins.length > 0
           ? `${closeGames}/${weeklyMargins.length} games within 5 cups`
@@ -267,26 +270,24 @@ export default async function HomePage() {
           : 'Margins update when game states are finalized.'
     },
     {
-      label: 'Shot profile',
-      value:
-        totalMakes > 0
-          ? `${Math.round((topShare ?? 0) * 100)}% tops · ${Math.round((1 - (topShare ?? 0)) * 100)}% bottoms`
-          : 'No makes logged yet',
-      detail:
-        totalMakes > 0
-          ? `${((isoShare ?? 0) * 100).toFixed(1)}% ISO share of makes`
-          : 'Profile updates as makes are logged.'
-    },
-    {
-      label: 'Pressure & pace',
+      label: 'Late-game conversion',
       value:
         clutchAttempts > 0
-          ? `${((clutchFg ?? 0) * 100).toFixed(1)}% FG at <=20 cups`
-          : 'No tracked clutch sample yet',
+          ? `${((clutchFg ?? 0) * 100).toFixed(1)}% FG in ≤20-cup shots`
+          : 'No tracked late-game sample yet',
       detail:
-        pace !== null
-          ? `${pace.toFixed(1)} tracked attempts per game this week`
-          : 'Pace appears once games are recorded.'
+        clutchAttempts > 0
+          ? `${clutchMakes}/${clutchAttempts} makes in clutch windows`
+          : 'Late-game efficiency appears once tracked shots are logged.'
+    },
+    {
+      label: 'Offensive tempo',
+      value:
+        pace !== null ? `${pace.toFixed(1)} shots per game` : 'No shot-volume sample yet',
+      detail:
+        makesPerGame !== null
+          ? `${makesPerGame.toFixed(1)} makes per game · ${(100 * (isoShare ?? 0)).toFixed(1)}% ISO make share`
+          : 'Tempo updates once league games are recorded.'
     }
   ];
 
@@ -424,8 +425,8 @@ export default async function HomePage() {
         </div>
 
         <div className="rounded-2xl border border-garnet-100 bg-white/80 p-3 shadow sm:p-5">
-          <p className="text-sm uppercase tracking-wide text-garnet-600">AI recap</p>
-          <h2 className="mt-2 text-xl font-semibold text-ink">Weekly intel (scaffold)</h2>
+          <p className="text-sm uppercase tracking-wide text-garnet-600">Week brief</p>
+          <h2 className="mt-2 text-xl font-semibold text-ink">Weekly snapshot</h2>
           <p className="mt-3 text-sm text-ash">
             {latestWeek
               ? `Derived from Week ${latestWeek} league results.`
@@ -441,7 +442,7 @@ export default async function HomePage() {
             ))}
           </div>
           <div className="mt-4 rounded-xl border border-dashed border-garnet-200 bg-white/70 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-ash">Narrative layer</p>
+            <p className="text-[11px] uppercase tracking-wide text-ash">Auto recap</p>
             <p className="mt-1 text-sm text-ash">
               {recap.source === 'gemini'
                 ? recap.text
@@ -536,7 +537,9 @@ export default async function HomePage() {
                       <p className="font-semibold text-ink">
                         {game.homeTeam?.name ?? 'Home'} vs {game.awayTeam?.name ?? 'Away'}
                       </p>
-                      <p className="text-xs text-ash">{game.startedAt.toLocaleDateString?.() ?? ''}</p>
+                      <p className="text-xs text-ash">
+                        {game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : game.startedAt.toLocaleDateString?.() ?? ''}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-garnet-600">

@@ -72,7 +72,7 @@ export function LiveScorebug({ gameId, initialData }: { gameId: string; initialD
       );
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="grid w-full gap-3 sm:grid-cols-2">
       <TeamScoreCard
         label={data.homeTeam?.name ?? 'Home'}
         made={homeMade}
@@ -112,9 +112,9 @@ function TeamScoreCard({
         : 'border-garnet-100 bg-parchment/70 text-ink';
 
   return (
-    <div className={`rounded-xl border px-4 py-3 ${resultStyles}`}>
+    <div className={`w-full min-w-0 rounded-xl border px-4 py-3 ${resultStyles}`}>
       <div className="flex items-center justify-between text-xs uppercase text-ash">
-        <span>{label}</span>
+        <span className="truncate">{label}</span>
       </div>
       <div className="mt-2 text-2xl font-bold text-garnet-700">{made}</div>
       <div className="mt-1 text-xs text-ash">Remaining: {remaining}</div>
