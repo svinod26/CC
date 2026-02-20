@@ -120,7 +120,7 @@ export function RequestAccessForm() {
       )}
 
       <button
-        disabled={status === 'loading' || lookupStatus === 'missing'}
+        disabled={status === 'loading'}
         className="w-full rounded-full border border-garnet-200 bg-white/90 px-5 py-3 text-base font-semibold text-garnet-700 shadow hover:bg-gold-100 disabled:opacity-50"
         type="submit"
       >

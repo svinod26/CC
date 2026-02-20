@@ -1,10 +1,24 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { loadEmailMapping } from '@/lib/email-mapping';
+import { prisma } from '@/lib/prisma';
 
 const schema = z.object({
   email: z.string().email()
 });
+const canonicalizeEmail = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  const atIndex = normalized.indexOf('@');
+  if (atIndex < 1) return normalized;
+  const local = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex + 1);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const withoutTag = local.split('+')[0] ?? local;
+    const withoutDots = withoutTag.replace(/\./g, '');
+    return `${withoutDots}@gmail.com`;
+  }
+  return normalized;
+};
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => null);
@@ -17,11 +31,32 @@ export async function POST(req: Request) {
   }
 
   const email = parsed.data.email.trim().toLowerCase();
-  const mapping = loadEmailMapping();
-  const entry = mapping.get(email);
-  if (!entry) {
-    return NextResponse.json({ found: false });
+  const canonicalEmail = canonicalizeEmail(email);
+  try {
+    const mapping = loadEmailMapping();
+    const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
+    if (entry) {
+      return NextResponse.json({ found: true, name: entry.name });
+    }
+  } catch (error) {
+    console.error('Lookup email mapping load failed; falling back to database lookup', error);
   }
 
-  return NextResponse.json({ found: true, name: entry.name });
+  const player = await prisma.player.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { name: true }
+  });
+  if (player?.name) {
+    return NextResponse.json({ found: true, name: player.name });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { name: true }
+  });
+  if (user?.name) {
+    return NextResponse.json({ found: true, name: user.name });
+  }
+
+  return NextResponse.json({ found: false });
 }

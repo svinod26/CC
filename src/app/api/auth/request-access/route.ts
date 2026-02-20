@@ -11,6 +11,19 @@ const requestSchema = z.object({
 });
 
 const generatePassword = () => randomBytes(9).toString('base64url');
+const canonicalizeEmail = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  const atIndex = normalized.indexOf('@');
+  if (atIndex < 1) return normalized;
+  const local = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex + 1);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const withoutTag = local.split('+')[0] ?? local;
+    const withoutDots = withoutTag.replace(/\./g, '');
+    return `${withoutDots}@gmail.com`;
+  }
+  return normalized;
+};
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => null);
@@ -23,13 +36,33 @@ export async function POST(req: Request) {
   }
 
   const email = parsed.data.email.trim().toLowerCase();
-  const mapping = loadEmailMapping();
-  const entry = mapping.get(email);
-  const resolvedName = entry?.name;
+  const canonicalEmail = canonicalizeEmail(email);
+  let resolvedName: string | null = null;
+  try {
+    const mapping = loadEmailMapping();
+    const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
+    resolvedName = entry?.name ?? null;
+  } catch (error) {
+    console.error('Email mapping load failed; falling back to database lookup', error);
+  }
+  if (!resolvedName) {
+    const playerByEmail = await prisma.player.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { name: true }
+    });
+    resolvedName = playerByEmail?.name ?? null;
+  }
+  if (!resolvedName) {
+    const userByEmail = await prisma.user.findUnique({
+      where: { email },
+      select: { name: true }
+    });
+    resolvedName = userByEmail?.name ?? null;
+  }
 
   if (!resolvedName) {
     return NextResponse.json(
-      { error: 'Email not found in roster mapping. Use the email listed by the commissioner.' },
+      { error: 'Email not recognized. Use your roster email or ask the commissioner to add/link it.' },
       { status: 404 }
     );
   }
