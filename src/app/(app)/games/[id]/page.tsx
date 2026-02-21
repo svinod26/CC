@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Viewport } from 'next';
 import { prisma } from '@/lib/prisma';
 import { LiveConsole } from '@/components/live-console';
-import { advancedStats, baseRatingStats, boxScore, defaultMultipliers, winnerFromRemaining } from '@/lib/stats';
+import { advancedStats, baseRatingStats, boxScore, defaultMultipliers, winnerFromGameState } from '@/lib/stats';
 import { PlayerLink } from '@/components/player-link';
 import { getServerAuthSession } from '@/lib/auth';
 import { LiveBoxScores } from '@/components/live-box-scores';
@@ -64,7 +64,13 @@ export default async function GamePage({ params }: { params: { id: string } }) {
   const homeMade = Math.max(0, 100 - awayRemaining);
   const awayMade = Math.max(0, 100 - homeRemaining);
   const hasResult = game.state !== null && game.state !== undefined;
-  const winner = hasResult ? winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource) : null;
+  const winner = hasResult
+    ? winnerFromGameState(game.state, {
+        statsSource: game.statsSource,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId
+      })
+    : null;
   const homeWon = winner === 'home';
   const awayWon = winner === 'away';
 
@@ -457,7 +463,7 @@ function TeamScoreCard({
       </div>
       <div className="mt-2 text-xs uppercase text-ash">Cups made</div>
       <div className="text-2xl font-bold text-ink">{made}</div>
-      <div className="mt-1 text-xs text-ash">Remaining: {remaining}</div>
+      <div className="mt-1 text-xs text-ash">On your side: {remaining}</div>
       <div className="mt-1 text-[11px] text-ash">Pulled cups: {pulled}</div>
     </div>
   );

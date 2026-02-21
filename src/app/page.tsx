@@ -3,7 +3,7 @@ import { getServerAuthSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { ResultType } from '@prisma/client';
-import { isMake, isShot, winnerFromRemaining } from '@/lib/stats';
+import { isMake, isShot, winnerFromGameState } from '@/lib/stats';
 import { getWeeklyRecap } from '@/lib/ai';
 import { resolveSeasonSelection } from '@/lib/season';
 
@@ -129,7 +129,7 @@ export default async function HomePage() {
           seasonId: currentSeason.id
         },
         orderBy: { startedAt: 'desc' },
-        take: 5,
+        take: 20,
         include: {
           homeTeam: true,
           awayTeam: true,
@@ -360,13 +360,11 @@ export default async function HomePage() {
               >
                 <div>
                   {(() => {
-                    const winner = game.state
-                      ? winnerFromRemaining(
-                          game.state.homeCupsRemaining,
-                          game.state.awayCupsRemaining,
-                          game.statsSource
-                        )
-                      : null;
+                    const winner = winnerFromGameState(game.state, {
+                      statsSource: game.statsSource,
+                      homeTeamId: game.homeTeamId,
+                      awayTeamId: game.awayTeamId
+                    });
                     const homeWon = winner === 'home';
                     const awayWon = winner === 'away';
                     const pillClass = (won: boolean, lost: boolean) =>

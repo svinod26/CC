@@ -38,6 +38,13 @@ const fetcher = async (url: string) => {
 
 const touchClass = 'touch-manipulation select-none active:scale-[0.98]';
 
+const shortenTeam = (name: string | null | undefined, max = 14) => {
+  const value = (name ?? '').trim();
+  if (!value) return 'Team';
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}...`;
+};
+
 export function LiveConsole({
   gameId,
   initialData,
@@ -49,7 +56,7 @@ export function LiveConsole({
 }) {
   const { data, mutate } = useSWR<GameStatePayload | null>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: initialData,
-    refreshInterval: isScorer ? 900 : 1200,
+    refreshInterval: isScorer ? 700 : 1000,
     revalidateOnFocus: true
   });
   const router = useRouter();
@@ -67,6 +74,16 @@ export function LiveConsole({
     ? [data?.homeTeam, data?.awayTeam].find((team) => team?.id === possessionTeamId)
     : data?.homeTeam;
   const phase = data?.state?.phase ?? 'REGULATION';
+  const homeName = data?.homeTeam?.name ?? 'Home';
+  const awayName = data?.awayTeam?.name ?? 'Away';
+  const homeShort = shortenTeam(homeName);
+  const awayShort = shortenTeam(awayName);
+  const overtimeNeedsWinner =
+    phase === 'OVERTIME' &&
+    data?.state?.status === 'IN_PROGRESS' &&
+    data?.state?.homeCupsRemaining === 0 &&
+    data?.state?.awayCupsRemaining === 0;
+  const [overtimeWinnerId, setOvertimeWinnerId] = useState<string | null>(null);
 
   const offenseLineup = useMemo(
     () =>
@@ -114,21 +131,32 @@ export function LiveConsole({
     }
   }, [data, router]);
 
-  const postEvent = async (body: Record<string, any>) => {
-    setLoadingAction(true);
-    setActionError(null);
-    const res = await fetch(`/api/games/${gameId}/events`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    setLoadingAction(false);
-    if (!res.ok) {
-      const parsed = await res.json().catch(() => ({}));
-      setActionError(parsed?.error ?? 'Failed to record event');
-      return;
+  useEffect(() => {
+    if (!overtimeNeedsWinner) {
+      setOvertimeWinnerId(null);
     }
-    await mutate();
+  }, [overtimeNeedsWinner]);
+
+  const postEvent = async (body: Record<string, any>) => {
+    try {
+      setLoadingAction(true);
+      setActionError(null);
+      const res = await fetch(`/api/games/${gameId}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const parsed = await res.json().catch(() => ({}));
+        setActionError(parsed?.error ?? 'Failed to record event');
+        return;
+      }
+      await mutate();
+    } catch {
+      setActionError('Failed to record event');
+    } finally {
+      setLoadingAction(false);
+    }
   };
 
   const handleShot = async (resultType: ResultType) => {
@@ -145,30 +173,44 @@ export function LiveConsole({
     await postEvent({ resultType: type, teamId: possessionTeamId, count });
   };
 
-  const handleFinalize = async () => {
-    setLoadingAction(true);
-    setActionError(null);
-    const res = await fetch(`/api/games/${gameId}/finalize`, { method: 'POST' });
-    setLoadingAction(false);
-    if (!res.ok) {
-      const parsed = await res.json().catch(() => ({}));
-      setActionError(parsed?.error ?? 'Failed to end game');
-      return;
+  const handleFinalize = async (winnerTeamId?: string) => {
+    try {
+      setLoadingAction(true);
+      setActionError(null);
+      const res = await fetch(`/api/games/${gameId}/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(winnerTeamId ? { winnerTeamId } : {})
+      });
+      if (!res.ok) {
+        const parsed = await res.json().catch(() => ({}));
+        setActionError(parsed?.error ?? 'Failed to end game');
+        return;
+      }
+      await mutate();
+    } catch {
+      setActionError('Failed to end game');
+    } finally {
+      setLoadingAction(false);
     }
-    await mutate();
   };
 
   const handleUndo = async () => {
-    setLoadingAction(true);
-    setActionError(null);
-    const res = await fetch(`/api/games/${gameId}/undo`, { method: 'POST' });
-    setLoadingAction(false);
-    if (!res.ok) {
-      const parsed = await res.json().catch(() => ({}));
-      setActionError(parsed?.error ?? 'Nothing to undo');
-      return;
+    try {
+      setLoadingAction(true);
+      setActionError(null);
+      const res = await fetch(`/api/games/${gameId}/undo`, { method: 'POST' });
+      if (!res.ok) {
+        const parsed = await res.json().catch(() => ({}));
+        setActionError(parsed?.error ?? 'Nothing to undo');
+        return;
+      }
+      await mutate();
+    } catch {
+      setActionError('Nothing to undo');
+    } finally {
+      setLoadingAction(false);
     }
-    await mutate();
   };
 
   const openAdjustment = (target: 'PULL_HOME' | 'PULL_AWAY' | 'ADD_HOME' | 'ADD_AWAY') => {
@@ -222,7 +264,10 @@ export function LiveConsole({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-ash">Shooter up</p>
           <p className="text-lg font-bold text-garnet-700">{activeShooter?.name ?? '—'}</p>
         </div>
-        <div className="rounded-full bg-gold-50 px-3 py-1 text-sm font-semibold text-ink">Makes this rack: {turnMakes}</div>
+        <div className="flex items-center gap-2">
+          {loadingAction && <span className="text-xs font-semibold text-ash">Updating...</span>}
+          <div className="rounded-full bg-gold-50 px-3 py-1 text-sm font-semibold text-ink">Makes this rack: {turnMakes}</div>
+        </div>
       </div>
 
       {actionError && (
@@ -233,22 +278,72 @@ export function LiveConsole({
 
       {isScorer && !isFinal && (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <ShotButton label="Top" onClick={() => handleShot(ResultType.TOP_REGULAR)} disabled={loadingAction} />
-            <ShotButton label="Top ISO" onClick={() => handleShot(ResultType.TOP_ISO)} disabled={loadingAction} />
-            <ShotButton
-              label="Bottom"
-              onClick={() => handleShot(ResultType.BOTTOM_REGULAR)}
-              disabled={loadingAction}
-            />
-            <ShotButton
-              label="Bottom ISO"
-              onClick={() => handleShot(ResultType.BOTTOM_ISO)}
-              disabled={loadingAction}
-            />
-            <ShotButton label="Miss" variant="miss" onClick={() => handleShot(ResultType.MISS)} disabled={loadingAction} />
-            <ShotButton label="Undo" variant="undo" onClick={handleUndo} disabled={loadingAction} />
-          </div>
+          {!overtimeNeedsWinner && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <ShotButton label="Top" onClick={() => handleShot(ResultType.TOP_REGULAR)} disabled={loadingAction} />
+              <ShotButton label="Top ISO" onClick={() => handleShot(ResultType.TOP_ISO)} disabled={loadingAction} />
+              <ShotButton
+                label="Bottom"
+                onClick={() => handleShot(ResultType.BOTTOM_REGULAR)}
+                disabled={loadingAction}
+              />
+              <ShotButton
+                label="Bottom ISO"
+                onClick={() => handleShot(ResultType.BOTTOM_ISO)}
+                disabled={loadingAction}
+              />
+              <ShotButton label="Miss" variant="miss" onClick={() => handleShot(ResultType.MISS)} disabled={loadingAction} />
+              <ShotButton label="Undo" variant="undo" onClick={handleUndo} disabled={loadingAction} />
+            </div>
+          )}
+
+          {overtimeNeedsWinner && (
+            <div className="rounded-2xl border border-gold-300 bg-gold-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-garnet-600">Overtime decision</p>
+              <p className="mt-1 text-sm text-ink">Both sides reached 0. Pick the overtime winner, then finalize.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setOvertimeWinnerId(data?.homeTeam?.id ?? null)}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${touchClass} ${
+                    overtimeWinnerId === data?.homeTeam?.id
+                      ? 'border-garnet-300 bg-garnet-600 text-white'
+                      : 'border-garnet-200 bg-white text-garnet-700'
+                  }`}
+                >
+                  {homeName} won OT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOvertimeWinnerId(data?.awayTeam?.id ?? null)}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${touchClass} ${
+                    overtimeWinnerId === data?.awayTeam?.id
+                      ? 'border-garnet-300 bg-garnet-600 text-white'
+                      : 'border-garnet-200 bg-white text-garnet-700'
+                  }`}
+                >
+                  {awayName} won OT
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={loadingAction || !overtimeWinnerId}
+                  onClick={() => handleFinalize(overtimeWinnerId ?? undefined)}
+                  className={`rounded-xl border border-rose-300 bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${touchClass}`}
+                >
+                  Confirm OT winner and end game
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOvertimeWinnerId(null)}
+                  className={`rounded-xl border border-garnet-200 bg-white px-3 py-2 text-sm font-semibold text-garnet-700 ${touchClass}`}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 sm:p-4">
             <button
@@ -267,46 +362,47 @@ export function LiveConsole({
                     onClick={() => openAdjustment('PULL_HOME')}
                     className={`rounded-xl border border-rose-200 bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-900 ${touchClass}`}
                   >
-                    Pull home cup
+                    Pull {homeShort} side
                   </button>
                   <button
                     type="button"
                     onClick={() => openAdjustment('PULL_AWAY')}
                     className={`rounded-xl border border-rose-200 bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-900 ${touchClass}`}
                   >
-                    Pull away cup
+                    Pull {awayShort} side
                   </button>
                   <button
                     type="button"
                     onClick={() => openAdjustment('ADD_HOME')}
                     className={`rounded-xl border border-gold-200 bg-gold-50 px-3 py-2 text-sm font-semibold text-garnet-700 ${touchClass}`}
                   >
-                    Add home cup
+                    Add {homeShort} side
                   </button>
                   <button
                     type="button"
                     onClick={() => openAdjustment('ADD_AWAY')}
                     className={`rounded-xl border border-gold-200 bg-gold-50 px-3 py-2 text-sm font-semibold text-garnet-700 ${touchClass}`}
                   >
-                    Add away cup
+                    Add {awayShort} side
                   </button>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
+                    disabled={overtimeNeedsWinner}
                     onClick={() => {
                       setEndConfirm(true);
                       setAdjustTarget(null);
                       setOptionsOpen(false);
                     }}
-                    className={`rounded-xl border border-rose-300 bg-rose-600 px-4 py-3 text-sm font-semibold text-white ${touchClass}`}
+                    className={`rounded-xl border border-rose-300 bg-rose-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 ${touchClass}`}
                   >
                     End game
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push('/games')}
-                    className={`rounded-xl border border-garnet-200 bg-white px-4 py-3 text-sm font-semibold text-garnet-700 ${touchClass}`}
+                    className={`rounded-xl border border-garnet-300 bg-garnet-100 px-4 py-3 text-sm font-semibold text-garnet-700 ${touchClass}`}
                   >
                     Save and exit
                   </button>
@@ -317,10 +413,10 @@ export function LiveConsole({
             {adjustTarget && (
               <div className="mt-3 rounded-xl border border-garnet-100 bg-white p-3">
                 <p className="text-xs uppercase tracking-wide text-ash">
-                  {adjustTarget === 'PULL_HOME' && 'Pull from home rack'}
-                  {adjustTarget === 'PULL_AWAY' && 'Pull from away rack'}
-                  {adjustTarget === 'ADD_HOME' && 'Add to home rack'}
-                  {adjustTarget === 'ADD_AWAY' && 'Add to away rack'}
+                  {adjustTarget === 'PULL_HOME' && `Pull from ${homeName} side`}
+                  {adjustTarget === 'PULL_AWAY' && `Pull from ${awayName} side`}
+                  {adjustTarget === 'ADD_HOME' && `Add to ${homeName} side`}
+                  {adjustTarget === 'ADD_AWAY' && `Add to ${awayName} side`}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {[1, 2, 3, 5].map((value) => (
@@ -397,7 +493,9 @@ export function LiveConsole({
 
       {!isScorer && (
         <div className="rounded-xl border border-garnet-100 bg-white/75 px-3 py-2 text-xs text-ash">
-          View-only mode. Live score updates refresh automatically.
+          {overtimeNeedsWinner
+            ? 'Overtime pending: scorer must pick winner to finalize.'
+            : 'View-only mode. Live score updates refresh automatically.'}
         </div>
       )}
     </div>

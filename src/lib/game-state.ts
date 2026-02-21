@@ -130,16 +130,25 @@ export async function recomputeGameState(gameId: string, options: RecomputeOptio
     }
 
     const lastTurn = turns[turns.length - 1];
-    const possessionTeamId = lastTurn?.offenseTeamId ?? game.homeTeamId;
+    const derivedPossessionTeamId = lastTurn?.offenseTeamId ?? game.homeTeamId;
     const zeroTeamId = homeCups <= 0 ? game.homeTeamId : awayCups <= 0 ? game.awayTeamId : null;
     const nextPhase =
       game.state.phase === GamePhase.OVERTIME
         ? GamePhase.OVERTIME
-        : zeroTeamId && possessionTeamId === zeroTeamId
+        : zeroTeamId && derivedPossessionTeamId === zeroTeamId
           ? GamePhase.REDEMPTION
           : GamePhase.REGULATION;
     const preserveFinal = Boolean(options.preserveFinalStatus && game.status === GameStatus.FINAL);
     const nextStatus = preserveFinal ? GameStatus.FINAL : GameStatus.IN_PROGRESS;
+    const preserveOvertimeWinner =
+      preserveFinal &&
+      game.state.phase === GamePhase.OVERTIME &&
+      homeCups === 0 &&
+      awayCups === 0 &&
+      Boolean(game.state.possessionTeamId);
+    const possessionTeamId = preserveOvertimeWinner
+      ? game.state.possessionTeamId
+      : derivedPossessionTeamId;
 
     await tx.gameState.updateMany({
       where: { gameId },

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { resolveSeasonSelection } from '@/lib/season';
 import { SeasonSelect } from '@/components/season-select';
-import { winnerFromRemaining } from '@/lib/stats';
+import { winnerFromGameState } from '@/lib/stats';
 
 export const metadata = {
   title: 'League | Century Cup'
@@ -60,7 +60,11 @@ export default async function LeaguePage({
     away.games += 1;
     const homeRemaining = game.state.homeCupsRemaining;
     const awayRemaining = game.state.awayCupsRemaining;
-    const winner = winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource);
+    const winner = winnerFromGameState(game.state, {
+      statsSource: game.statsSource,
+      homeTeamId: game.homeTeamId,
+      awayTeamId: game.awayTeamId
+    });
     if (winner === 'home') {
       home.wins += 1;
       away.losses += 1;

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { ResultType } from '@prisma/client';
-import { isMake, isShot, winnerFromRemaining } from '@/lib/stats';
+import { isMake, isShot, winnerFromGameState } from '@/lib/stats';
 import { TeamCard } from '@/components/team-card';
 import { resolveSeasonSelection } from '@/lib/season';
 import { SeasonSelect } from '@/components/season-select';
@@ -126,7 +126,11 @@ export default async function TeamsPage({
       home.weekNet[week - 1] += margin;
       away.weekNet[week - 1] -= margin;
     }
-    const winner = winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource);
+    const winner = winnerFromGameState(game.state, {
+      statsSource: game.statsSource,
+      homeTeamId: game.homeTeamId,
+      awayTeamId: game.awayTeamId
+    });
     if (winner === 'home') {
       home.wins += 1;
       away.losses += 1;

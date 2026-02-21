@@ -2,7 +2,7 @@
 
 import useSWR from 'swr';
 import { ResultType, StatsSource } from '@prisma/client';
-import { winnerFromRemaining } from '@/lib/stats';
+import { winnerFromGameState } from '@/lib/stats';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -11,7 +11,13 @@ type LiveGame = {
   statsSource: StatsSource;
   homeTeam: { id: string; name: string } | null;
   awayTeam: { id: string; name: string } | null;
-  state: { homeCupsRemaining: number; awayCupsRemaining: number } | null;
+  state: {
+    homeCupsRemaining: number;
+    awayCupsRemaining: number;
+    phase?: string | null;
+    status?: string | null;
+    possessionTeamId?: string | null;
+  } | null;
   events: { resultType: ResultType; cupsDelta: number; offenseTeamId?: string | null }[];
   legacyTeamStats?: { teamId: string | null; pulledCups: number }[];
 };
@@ -51,7 +57,11 @@ export function LiveScorebug({ gameId, initialData }: { gameId: string; initialD
     data.statsSource === StatsSource.TRACKED && hasOffenseScopedMakes
       ? trackedMakesByTeam.away
       : Math.max(0, 100 - homeRemaining);
-  const winner = winnerFromRemaining(homeRemaining, awayRemaining, data.statsSource);
+  const winner = winnerFromGameState(data.state, {
+    statsSource: data.statsSource,
+    homeTeamId: data.homeTeam?.id,
+    awayTeamId: data.awayTeam?.id
+  });
 
   const pulledHome = data.statsSource === 'LEGACY'
     ? data.legacyTeamStats?.find((stat) => stat.teamId === data.homeTeam?.id)?.pulledCups ?? 0
@@ -117,7 +127,7 @@ function TeamScoreCard({
         <span className="truncate">{label}</span>
       </div>
       <div className="mt-2 text-2xl font-bold text-garnet-700">{made}</div>
-      <div className="mt-1 text-xs text-ash">Remaining: {remaining}</div>
+      <div className="mt-1 text-xs text-ash">On your side: {remaining}</div>
       <div className="text-xs text-ash">Pulled cups: {pulled}</div>
     </div>
   );

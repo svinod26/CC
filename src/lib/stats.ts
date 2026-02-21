@@ -47,6 +47,35 @@ export function winnerFromRemaining(
   return awayRemaining < homeRemaining ? 'home' : 'away';
 }
 
+type WinnerStateLike = {
+  homeCupsRemaining: number | null | undefined;
+  awayCupsRemaining: number | null | undefined;
+  phase?: string | null;
+  status?: string | null;
+  possessionTeamId?: string | null;
+};
+
+export function winnerFromGameState(
+  state: WinnerStateLike | null | undefined,
+  options: {
+    statsSource: StatsSource | null | undefined;
+    homeTeamId?: string | null;
+    awayTeamId?: string | null;
+  }
+) {
+  const base = winnerFromRemaining(state?.homeCupsRemaining, state?.awayCupsRemaining, options.statsSource);
+  if (base) return base;
+  if (!state) return null;
+
+  const tiedAtZero = state.homeCupsRemaining === 0 && state.awayCupsRemaining === 0;
+  const isOvertimeFinal = state.phase === 'OVERTIME' && state.status === 'FINAL';
+  if (!tiedAtZero || !isOvertimeFinal || !state.possessionTeamId) return null;
+
+  if (options.homeTeamId && state.possessionTeamId === options.homeTeamId) return 'home';
+  if (options.awayTeamId && state.possessionTeamId === options.awayTeamId) return 'away';
+  return null;
+}
+
 type ShotLike = {
   resultType: ResultType;
   shooterId?: string | null;

@@ -1,12 +1,18 @@
 import { StatsSource } from '@prisma/client';
-import { winnerFromRemaining } from '@/lib/stats';
+import { winnerFromGameState } from '@/lib/stats';
 
 type WeeklyGame = {
   id: string;
   statsSource: StatsSource;
-  homeTeam: { name: string } | null;
-  awayTeam: { name: string } | null;
-  state: { homeCupsRemaining: number; awayCupsRemaining: number } | null;
+  homeTeam: { id: string; name: string } | null;
+  awayTeam: { id: string; name: string } | null;
+  state: {
+    homeCupsRemaining: number;
+    awayCupsRemaining: number;
+    phase?: string | null;
+    status?: string | null;
+    possessionTeamId?: string | null;
+  } | null;
 };
 
 type TopPerformer = {
@@ -32,9 +38,11 @@ const defaultRecap = (input: RecapInput) => {
     .map((game) => {
       const home = game.homeTeam?.name ?? 'Home';
       const away = game.awayTeam?.name ?? 'Away';
-      const homeRemaining = game.state?.homeCupsRemaining ?? 0;
-      const awayRemaining = game.state?.awayCupsRemaining ?? 0;
-      const winnerKey = winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource);
+      const winnerKey = winnerFromGameState(game.state, {
+        statsSource: game.statsSource,
+        homeTeamId: game.homeTeam?.id,
+        awayTeamId: game.awayTeam?.id
+      });
       const winner = winnerKey === 'home' ? home : winnerKey === 'away' ? away : 'Tie';
       return `${home} vs ${away} (winner: ${winner}).`;
     })
@@ -55,7 +63,11 @@ export async function getWeeklyRecap(input: RecapInput) {
     const away = game.awayTeam?.name ?? 'Away';
     const homeRemaining = game.state?.homeCupsRemaining ?? 0;
     const awayRemaining = game.state?.awayCupsRemaining ?? 0;
-    const winnerKey = winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource);
+    const winnerKey = winnerFromGameState(game.state, {
+      statsSource: game.statsSource,
+      homeTeamId: game.homeTeam?.id,
+      awayTeamId: game.awayTeam?.id
+    });
     const winner = winnerKey === 'home' ? home : winnerKey === 'away' ? away : 'Tie';
     return `${home} vs ${away} (winner: ${winner}, remaining ${homeRemaining}-${awayRemaining}, ${game.statsSource.toLowerCase()})`;
   });

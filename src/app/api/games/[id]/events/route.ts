@@ -63,6 +63,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (game.status !== GameStatus.IN_PROGRESS) {
     return NextResponse.json({ error: 'Only in-progress games can be edited' }, { status: 403 });
   }
+  if (
+    game.state.phase === 'OVERTIME' &&
+    game.state.homeCupsRemaining === 0 &&
+    game.state.awayCupsRemaining === 0
+  ) {
+    return NextResponse.json(
+      { error: 'Select overtime winner to finalize this game.' },
+      { status: 400 }
+    );
+  }
 
   const currentTurn = game.turns[0];
   const phase = game.state.phase ?? 'REGULATION';
@@ -198,7 +208,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (nextHome === 0 && nextAway === 0) {
       nextPhase = 'OVERTIME';
-      newStatus = GameStatus.FINAL;
       shooterIndex = 0;
     } else if (phase === 'REDEMPTION') {
       const opponentRemaining = offenseTeamId === game.homeTeamId ? nextAway : nextHome;

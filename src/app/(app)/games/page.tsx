@@ -4,7 +4,7 @@ import { resolveSeasonSelection } from '@/lib/season';
 import { SeasonSelect } from '@/components/season-select';
 import { GameTypeSelect } from '@/components/game-type-select';
 import { GameType } from '@prisma/client';
-import { winnerFromRemaining } from '@/lib/stats';
+import { winnerFromGameState } from '@/lib/stats';
 
 export const metadata = {
   title: 'Games | Century Cup'
@@ -60,7 +60,11 @@ export default async function GamesPage({
               const homeRemaining = game.state?.homeCupsRemaining ?? null;
               const awayRemaining = game.state?.awayCupsRemaining ?? null;
               const hasResult = homeRemaining !== null && awayRemaining !== null;
-              const winner = winnerFromRemaining(homeRemaining, awayRemaining, game.statsSource);
+              const winner = winnerFromGameState(game.state, {
+                statsSource: game.statsSource,
+                homeTeamId: game.homeTeamId,
+                awayTeamId: game.awayTeamId
+              });
               const homeWon = winner === 'home';
               const awayWon = winner === 'away';
               const remaining = hasResult ? Math.max(homeRemaining, awayRemaining) : '—';
