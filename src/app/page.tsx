@@ -3,7 +3,7 @@ import { getServerAuthSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { ResultType } from '@prisma/client';
-import { isMake, isShot, winnerFromGameState } from '@/lib/stats';
+import { defaultMultipliers, isMake, isShot, winnerFromGameState } from '@/lib/stats';
 import { getWeeklyRecap } from '@/lib/ai';
 import { resolveSeasonSelection } from '@/lib/season';
 
@@ -148,9 +148,16 @@ export default async function HomePage() {
     })
     .slice(0, 5);
 
+  const adjustedWeightFor = (resultType: ResultType) => {
+    if (resultType === ResultType.TOP_REGULAR) return defaultMultipliers.top;
+    if (resultType === ResultType.TOP_ISO) return defaultMultipliers.topIso;
+    if (resultType === ResultType.BOTTOM_ISO) return defaultMultipliers.bottomIso;
+    return defaultMultipliers.bottom;
+  };
+
   const topPerformers = new Map<
     string,
-    { id?: string; name: string; makes: number; attempts: number; fg: number; tops: number; bottoms: number }
+    { id?: string; name: string; makes: number; attempts: number; fg: number; adjustedFgm: number }
   >();
   weeklyEvents.forEach((event) => {
     if (!isShot(event.resultType) || !event.shooterId) return;
@@ -160,18 +167,12 @@ export default async function HomePage() {
       makes: 0,
       attempts: 0,
       fg: 0,
-      tops: 0,
-      bottoms: 0
+      adjustedFgm: 0
     };
     existing.attempts += 1;
     if (isMake(event.resultType)) {
       existing.makes += 1;
-      if (event.resultType === ResultType.TOP_REGULAR || event.resultType === ResultType.TOP_ISO) {
-        existing.tops += 1;
-      }
-      if (event.resultType === ResultType.BOTTOM_REGULAR || event.resultType === ResultType.BOTTOM_ISO) {
-        existing.bottoms += 1;
-      }
+      existing.adjustedFgm += adjustedWeightFor(event.resultType);
     }
     existing.fg = existing.attempts ? existing.makes / existing.attempts : 0;
     topPerformers.set(event.shooterId, existing);
@@ -185,22 +186,25 @@ export default async function HomePage() {
       makes: 0,
       attempts: 0,
       fg: 0,
-      tops: 0,
-      bottoms: 0
+      adjustedFgm: 0
     };
     const breakdown = stat.topRegular + stat.topIso + stat.bottomRegular + stat.bottomIso;
     const makes = stat.totalCups > 0 ? stat.totalCups : breakdown;
     const attempts = makes + stat.misses;
+    const adjustedFgm =
+      stat.topRegular * defaultMultipliers.top +
+      stat.topIso * defaultMultipliers.topIso +
+      stat.bottomRegular * defaultMultipliers.bottom +
+      stat.bottomIso * defaultMultipliers.bottomIso;
     existing.makes += makes;
     existing.attempts += attempts;
-    existing.tops += stat.topRegular + stat.topIso;
-    existing.bottoms += stat.bottomRegular + stat.bottomIso;
+    existing.adjustedFgm += adjustedFgm;
     existing.fg = existing.attempts ? existing.makes / existing.attempts : 0;
     topPerformers.set(stat.playerId, existing);
   });
 
   const topList = Array.from(topPerformers.values())
-    .sort((a, b) => b.makes - a.makes || b.fg - a.fg)
+    .sort((a, b) => b.adjustedFgm - a.adjustedFgm || b.makes - a.makes || b.fg - a.fg)
     .slice(0, 6);
 
   const weeklyMargins = latestWeekGames
@@ -304,7 +308,7 @@ export default async function HomePage() {
       name: player.name,
       makes: player.makes,
       fg: player.fg,
-      tops: player.tops
+      adjustedFgm: player.adjustedFgm
     }))
   });
 
@@ -441,13 +445,7 @@ export default async function HomePage() {
           </div>
           <div className="mt-4 rounded-xl border border-dashed border-garnet-200 bg-white/70 p-3">
             <p className="text-[11px] uppercase tracking-wide text-ash">Auto recap</p>
-            <p className="mt-1 text-sm text-ash">
-              {recap.source === 'gemini'
-                ? recap.text
-                : recap.reason === 'missing-key'
-                  ? 'Set GEMINI_API_KEY to add a short weekly storyline automatically.'
-                  : recap.text}
-            </p>
+            <p className="mt-1 text-sm text-ash">{recap.text}</p>
           </div>
         </div>
       </section>
@@ -472,7 +470,7 @@ export default async function HomePage() {
                     {player.name}
                   </p>
                   <p className="text-[11px] text-garnet-600 sm:text-sm sm:text-right">
-                    {player.makes} cups · {(player.fg * 100).toFixed(1)}% FG · {player.tops} tops
+                    {player.makes} cups · {(player.fg * 100).toFixed(1)}% FG · {player.adjustedFgm.toFixed(2)} adj FGM
                   </p>
                 </div>
               );

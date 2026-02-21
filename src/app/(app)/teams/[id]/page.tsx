@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { defaultMultipliers, isMake } from '@/lib/stats';
+import { defaultMultipliers, isMake, winnerFromGameState } from '@/lib/stats';
 import { Sparkline } from '@/components/sparkline';
 import { PlayerLink } from '@/components/player-link';
 import { ResultType } from '@prisma/client';
@@ -280,26 +280,46 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
             const isLegacy = game.statsSource === 'LEGACY';
             const weekLabel = game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : '—';
             const matchup = `${game.homeTeam?.name ?? 'Home'} vs ${game.awayTeam?.name ?? 'Away'}`;
+            const margin = game.state
+              ? Math.abs(game.state.homeCupsRemaining - game.state.awayCupsRemaining)
+              : null;
+            const winnerKey = winnerFromGameState(game.state, {
+              statsSource: game.statsSource,
+              homeTeamId: game.homeTeamId,
+              awayTeamId: game.awayTeamId
+            });
+            const teamWon =
+              winnerKey === 'home'
+                ? game.homeTeamId === team.id
+                : winnerKey === 'away'
+                  ? game.awayTeamId === team.id
+                  : null;
             return (
-              <div
+              <Link
                 key={game.id}
-                className="flex items-center justify-between rounded-xl border border-garnet-100 bg-parchment/70 px-4 py-3 text-sm"
+                href={`/games/${game.id}`}
+                className="flex items-center justify-between rounded-xl border border-garnet-100 bg-parchment/70 px-4 py-3 text-sm transition hover:bg-gold-50/60"
               >
                 <div>
                   <p className="font-semibold text-ink">{matchup}</p>
                   <p className="text-xs text-ash">{weekLabel}</p>
                 </div>
                 <div className="text-right">
+                  <p
+                    className={`text-xs font-semibold ${
+                      teamWon === true ? 'text-emerald-700' : teamWon === false ? 'text-rose-600' : 'text-ash'
+                    }`}
+                  >
+                    {teamWon === true ? 'W' : teamWon === false ? 'L' : '—'}
+                    {margin !== null ? ` · ${margin}` : ''}
+                  </p>
                   {isLegacy && (
                     <span className="rounded-full border border-gold-300 bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-garnet-600">
                       Legacy
                     </span>
                   )}
-                  <Link href={`/games/${game.id}`} className="ml-3 text-xs font-semibold text-garnet-600">
-                    View game
-                  </Link>
                 </div>
-              </div>
+              </Link>
             );
           })}
           {games.length === 0 && <p className="text-sm text-ash">No games logged yet.</p>}

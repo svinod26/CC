@@ -19,7 +19,7 @@ type TopPerformer = {
   name: string;
   makes: number;
   fg: number;
-  tops: number;
+  adjustedFgm: number;
 };
 
 type RecapInput = {
@@ -72,7 +72,9 @@ export async function getWeeklyRecap(input: RecapInput) {
     return `${home} vs ${away} (winner: ${winner}, remaining ${homeRemaining}-${awayRemaining}, ${game.statsSource.toLowerCase()})`;
   });
   const topLines = input.topPerformers.map((player) =>
-    `${player.name}: ${player.makes} cups, ${(player.fg * 100).toFixed(1)}% FG, ${player.tops} tops`
+    `${player.name}: ${player.makes} cups, ${(player.fg * 100).toFixed(1)}% FG, ${player.adjustedFgm.toFixed(
+      2
+    )} adjusted FGM`
   );
 
   const prompt = `You are writing a short league recap for a fraternity Century Cup pong league. Keep it to 2-3 sentences, confident and energetic. Mention the top performer and 1-2 game results. Use the data below, do not invent stats.
