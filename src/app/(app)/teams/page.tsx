@@ -114,23 +114,23 @@ export default async function TeamsPage({
     const home = teamStats.get(game.homeTeamId);
     const away = teamStats.get(game.awayTeamId);
     if (!home || !away) continue;
-    home.games += 1;
-    away.games += 1;
-    const homeRemaining = game.state.homeCupsRemaining;
-    const awayRemaining = game.state.awayCupsRemaining;
-    const margin = awayRemaining - homeRemaining;
-    home.margin += margin;
-    away.margin -= margin;
-    const week = game.scheduleEntry?.week;
-    if (week && week >= 1 && week <= weekCount) {
-      home.weekNet[week - 1] += margin;
-      away.weekNet[week - 1] -= margin;
-    }
     const winner = winnerFromGameState(game.state, {
       statsSource: game.statsSource,
       homeTeamId: game.homeTeamId,
       awayTeamId: game.awayTeamId
     });
+    const marginAbs = Math.abs(game.state.homeCupsRemaining - game.state.awayCupsRemaining);
+    const signedMarginForHome = winner === 'home' ? marginAbs : winner === 'away' ? -marginAbs : 0;
+
+    home.games += 1;
+    away.games += 1;
+    home.margin += signedMarginForHome;
+    away.margin -= signedMarginForHome;
+    const week = game.scheduleEntry?.week;
+    if (week && week >= 1 && week <= weekCount) {
+      home.weekNet[week - 1] += signedMarginForHome;
+      away.weekNet[week - 1] -= signedMarginForHome;
+    }
     if (winner === 'home') {
       home.wins += 1;
       away.losses += 1;
