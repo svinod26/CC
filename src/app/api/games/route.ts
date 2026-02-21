@@ -16,7 +16,7 @@ const schema = z.object({
   awayTeamName: z.string().optional(),
   location: z.string().optional(),
   scheduledAt: z.string().optional(),
-  week: z.number().optional(),
+  week: z.number().int().positive().optional(),
   homeLineupIds: z.array(z.string()).default([]),
   awayLineupIds: z.array(z.string()).default([])
 });
@@ -94,17 +94,41 @@ export async function POST(req: Request) {
         throw new Error('Teams must differ');
       }
 
-      const scheduleEntry =
-        data.type === GameType.LEAGUE && data.seasonId && data.week
-          ? await tx.schedule.findFirst({
-              where: {
-                seasonId: data.seasonId,
-                week: data.week,
-                homeTeamId,
-                awayTeamId
-              }
-            })
-          : null;
+      if (data.type === GameType.LEAGUE && !data.seasonId) {
+        throw new Error('League games require a season.');
+      }
+      if (data.type === GameType.LEAGUE && !data.week) {
+        throw new Error('League games require a week selection.');
+      }
+
+      let scheduleEntry: { id: string } | null = null;
+      if (data.type === GameType.LEAGUE && data.seasonId && data.week) {
+        scheduleEntry = await tx.schedule.findFirst({
+          where: {
+            seasonId: data.seasonId,
+            week: data.week,
+            gameId: null,
+            OR: [
+              { homeTeamId, awayTeamId },
+              { homeTeamId: awayTeamId, awayTeamId: homeTeamId }
+            ]
+          },
+          select: { id: true }
+        });
+
+        if (!scheduleEntry) {
+          const createdSchedule = await tx.schedule.create({
+            data: {
+              seasonId: data.seasonId,
+              week: data.week,
+              homeTeamId,
+              awayTeamId
+            },
+            select: { id: true }
+          });
+          scheduleEntry = createdSchedule;
+        }
+      }
 
       const createdGame = await tx.game.create({
         data: {

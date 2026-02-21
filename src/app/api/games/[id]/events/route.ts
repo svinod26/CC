@@ -196,7 +196,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     let nextPhase = phase;
     let nextLineupLength = turnLineupLength;
 
-    if (phase === 'REDEMPTION') {
+    if (nextHome === 0 && nextAway === 0) {
+      nextPhase = 'OVERTIME';
+      newStatus = GameStatus.FINAL;
+      shooterIndex = 0;
+    } else if (phase === 'REDEMPTION') {
       const opponentRemaining = offenseTeamId === game.homeTeamId ? nextAway : nextHome;
       if (!isPull) {
         if (!isMake) {

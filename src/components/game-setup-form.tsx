@@ -91,6 +91,10 @@ export function GameSetupForm({
         setError('Home and away teams must differ.');
         return;
       }
+      if (!Number.isInteger(week) || week < 1) {
+        setError('Select a valid week.');
+        return;
+      }
     } else {
       const trimmedHome = homeTeamName.trim();
       const trimmedAway = awayTeamName.trim();
