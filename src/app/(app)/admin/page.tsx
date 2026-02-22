@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { getServerAuthSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { AdminGameAdjustments } from '@/components/admin-game-adjustments';
-import { AdminGamePicker } from '@/components/admin-game-picker';
+import { AdminAuditLog } from '@/components/admin-audit-log';
+import { AdminGameWorkbench } from '@/components/admin-game-workbench';
 import { AdminUsersTable } from '@/components/admin-users-table';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Admin | Century Cup'
@@ -52,10 +52,10 @@ export default async function AdminPage({
     return b.startedAt.getTime() - a.startedAt.getTime();
   });
 
-  const selectedGameId = searchParams?.game && games.some((game) => game.id === searchParams.game)
-    ? searchParams.game
-    : games[0]?.id ?? null;
-  const selectedGame = selectedGameId ? games.find((game) => game.id === selectedGameId) ?? null : null;
+  const selectedGameId =
+    searchParams?.game && games.some((game) => game.id === searchParams.game)
+      ? searchParams.game
+      : games[0]?.id ?? null;
 
   const gameOptions = games.map((game) => {
     const week = game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : game.type;
@@ -66,34 +66,6 @@ export default async function AdminPage({
       sublabel: `${week} · ${new Date(game.startedAt).toLocaleDateString()}`
     };
   });
-
-  const selectedPlayers = selectedGame
-    ? Array.from(
-        new Map(
-          selectedGame.lineups
-            .sort((a, b) => {
-              if (a.teamId === selectedGame.homeTeamId && b.teamId !== selectedGame.homeTeamId) return -1;
-              if (a.teamId !== selectedGame.homeTeamId && b.teamId === selectedGame.homeTeamId) return 1;
-              if (a.teamId === selectedGame.awayTeamId && b.teamId !== selectedGame.awayTeamId) return 1;
-              if (a.teamId !== selectedGame.awayTeamId && b.teamId === selectedGame.awayTeamId) return -1;
-              return a.orderIndex - b.orderIndex;
-            })
-            .map((slot) => [
-              slot.playerId,
-              {
-                id: slot.playerId,
-                name: slot.player.name ?? 'Unknown',
-                teamName:
-                  slot.teamId === selectedGame.homeTeamId
-                    ? selectedGame.homeTeam?.name ?? 'Home'
-                    : slot.teamId === selectedGame.awayTeamId
-                      ? selectedGame.awayTeam?.name ?? 'Away'
-                      : 'Team'
-              }
-            ])
-        ).values()
-      )
-    : [];
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -116,48 +88,7 @@ export default async function AdminPage({
       </section>
 
       <section className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <div className="space-y-3 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-garnet-600">Corrections</p>
-            <h2 className="text-lg font-semibold text-ink">Game score editor</h2>
-            <p className="text-xs text-ash">
-              Choose a finalized tracked game, then add/remove player shots or pull/add cups on either side.
-            </p>
-          </div>
-
-          <AdminGamePicker games={gameOptions} selectedGameId={selectedGameId} />
-
-          {selectedGame ? (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-garnet-100 bg-parchment/70 p-3">
-                <p className="text-sm font-semibold text-ink">
-                  {selectedGame.homeTeam?.name ?? 'Home'} vs {selectedGame.awayTeam?.name ?? 'Away'}
-                </p>
-                <p className="text-xs text-ash">
-                  {selectedGame.scheduleEntry?.week ? `Week ${selectedGame.scheduleEntry.week}` : selectedGame.type} ·{' '}
-                  {new Date(selectedGame.startedAt).toLocaleDateString()}
-                </p>
-                <Link
-                  href={`/games/${selectedGame.id}`}
-                  className="mt-2 inline-flex text-xs font-semibold text-garnet-600 hover:text-garnet-500"
-                >
-                  Open game page
-                </Link>
-              </div>
-              <AdminGameAdjustments
-                gameId={selectedGame.id}
-                players={selectedPlayers}
-                homeTeamName={selectedGame.homeTeam?.name ?? 'Home'}
-                awayTeamName={selectedGame.awayTeam?.name ?? 'Away'}
-              />
-            </div>
-          ) : (
-            <p className="rounded-xl border border-garnet-100 bg-parchment/70 p-3 text-sm text-ash">
-              No finalized tracked games available.
-            </p>
-          )}
-        </div>
-
+        <AdminGameWorkbench games={gameOptions} initialGameId={selectedGameId} />
         <AdminUsersTable
           users={users.map((user) => ({
             ...user,
@@ -165,6 +96,8 @@ export default async function AdminPage({
           }))}
         />
       </section>
+
+      <AdminAuditLog />
     </div>
   );
 }

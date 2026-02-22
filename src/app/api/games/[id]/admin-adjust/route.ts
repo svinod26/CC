@@ -1,5 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import { logAdminAudit } from '@/lib/admin-audit';
+import { getAdminGameSnapshot } from '@/lib/admin-editor';
 import { recomputeGameState } from '@/lib/game-state';
 import { prisma } from '@/lib/prisma';
 import { GameStatus, ResultType } from '@prisma/client';
@@ -117,7 +118,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         afterState: refreshedState
       }
     });
-    return NextResponse.json({ ok: true });
+    const snapshot = await getAdminGameSnapshot(game.id);
+    return NextResponse.json({ ok: true, snapshot });
   }
 
   if (!parsedPlayer.success) {
@@ -173,7 +175,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         afterState: refreshedState
       }
     });
-    return NextResponse.json({ ok: true });
+    const snapshot = await getAdminGameSnapshot(game.id);
+    return NextResponse.json({ ok: true, snapshot });
   }
 
   const eventToDelete = await prisma.shotEvent.findFirst({
@@ -216,5 +219,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       afterState: refreshedState
     }
   });
-  return NextResponse.json({ ok: true });
+  const snapshot = await getAdminGameSnapshot(game.id);
+  return NextResponse.json({ ok: true, snapshot });
 }

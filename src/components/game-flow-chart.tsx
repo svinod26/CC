@@ -15,6 +15,14 @@ type Point = {
   diff: number;
 };
 
+type Segment = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+};
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const buildSeries = (
@@ -121,19 +129,56 @@ export function GameFlowChart({
   const zeroY = yFor(0);
 
   const linePath = points
-    .map((point, idx) => {
-      const x = padX + idx * stepX;
-      const y = yFor(point.diff);
-      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
+    .map((point, idx) => ({
+      x: padX + idx * stepX,
+      y: yFor(point.diff),
+      diff: point.diff
+    }));
+  const neutralPath = linePath
+    .map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
     .join(' ');
 
-  const areaPath = [
-    linePath,
-    `L ${(padX + (points.length - 1) * stepX).toFixed(2)} ${zeroY.toFixed(2)}`,
-    `L ${padX.toFixed(2)} ${zeroY.toFixed(2)}`,
-    'Z'
-  ].join(' ');
+  const homeColor = '#0f766e';
+  const awayColor = '#b4233c';
+
+  const segments: Segment[] = [];
+  for (let i = 1; i < linePath.length; i += 1) {
+    const prev = linePath[i - 1];
+    const curr = linePath[i];
+    const prevSign = Math.sign(prev.diff);
+    const currSign = Math.sign(curr.diff);
+
+    if (prevSign === currSign || prevSign === 0 || currSign === 0) {
+      const sign = prevSign !== 0 ? prevSign : currSign;
+      segments.push({
+        x1: prev.x,
+        y1: prev.y,
+        x2: curr.x,
+        y2: curr.y,
+        color: sign >= 0 ? homeColor : awayColor
+      });
+      continue;
+    }
+
+    const t = (0 - prev.diff) / (curr.diff - prev.diff);
+    const crossX = prev.x + (curr.x - prev.x) * t;
+    const crossY = zeroY;
+
+    segments.push({
+      x1: prev.x,
+      y1: prev.y,
+      x2: crossX,
+      y2: crossY,
+      color: prevSign > 0 ? homeColor : awayColor
+    });
+    segments.push({
+      x1: crossX,
+      y1: crossY,
+      x2: curr.x,
+      y2: curr.y,
+      color: currSign > 0 ? homeColor : awayColor
+    });
+  }
 
   const finalLabel =
     finalDiff === 0
@@ -141,6 +186,7 @@ export function GameFlowChart({
       : finalDiff > 0
         ? `${homeTeamName} +${finalDiff}`
         : `${awayTeamName} +${Math.abs(finalDiff)}`;
+  const finalColor = finalDiff === 0 ? 'text-ash' : finalDiff > 0 ? 'text-teal-700' : 'text-rose-700';
 
   return (
     <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
@@ -152,7 +198,7 @@ export function GameFlowChart({
           </p>
         </div>
         <div className="text-right text-xs text-ash">
-          <p className="font-semibold text-garnet-700">{finalLabel}</p>
+          <p className={`font-semibold ${finalColor}`}>{finalLabel}</p>
           <p>
             Max leads: {homeTeamName} +{homeLeadMax} · {awayTeamName} +{awayLeadMax}
           </p>
@@ -166,12 +212,8 @@ export function GameFlowChart({
           role="img"
           aria-label={`Game flow chart for ${homeTeamName} versus ${awayTeamName}`}
         >
-          <defs>
-            <linearGradient id={`flow-grad-${gameId}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#991B2B" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#991B2B" stopOpacity="0.04" />
-            </linearGradient>
-          </defs>
+          <rect x={padX} y={padY} width={plotWidth} height={Math.max(0, zeroY - padY)} fill="#ecfdf5" />
+          <rect x={padX} y={zeroY} width={plotWidth} height={Math.max(0, height - padY - zeroY)} fill="#fff1f2" />
           <line
             x1={padX}
             y1={zeroY}
@@ -181,15 +223,34 @@ export function GameFlowChart({
             strokeDasharray="4 4"
             strokeWidth="1.5"
           />
-          <path d={areaPath} fill={`url(#flow-grad-${gameId})`} />
-          <path d={linePath} fill="none" stroke="#7b2d2d" strokeWidth="3" strokeLinecap="round" />
+          <path d={neutralPath} fill="none" stroke="#d8c7c7" strokeWidth="2" />
+          {segments.map((segment, idx) => (
+            <line
+              key={`${segment.x1}-${segment.x2}-${idx}`}
+              x1={segment.x1}
+              y1={segment.y1}
+              x2={segment.x2}
+              y2={segment.y2}
+              stroke={segment.color}
+              strokeWidth="3.5"
+              strokeLinecap="round"
+            />
+          ))}
           <circle
             cx={padX + (points.length - 1) * stepX}
             cy={yFor(points[points.length - 1]?.diff ?? 0)}
             r="3.5"
-            fill="#7b2d2d"
+            fill={finalDiff >= 0 ? homeColor : awayColor}
           />
         </svg>
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-ash">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-teal-700" /> {homeTeamName} leading
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-rose-700" /> {awayTeamName} leading
+          </span>
+        </div>
         <div className="mt-1 flex items-center justify-between text-[11px] text-ash">
           <span>Start</span>
           <span>Latest scoring event</span>

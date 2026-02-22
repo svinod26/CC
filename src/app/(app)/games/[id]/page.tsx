@@ -6,9 +6,7 @@ import { advancedStats, baseRatingStats, boxScore, defaultMultipliers, winnerFro
 import { PlayerLink } from '@/components/player-link';
 import { getServerAuthSession } from '@/lib/auth';
 import { LiveBoxScores } from '@/components/live-box-scores';
-import { DeleteGameButton } from '@/components/delete-game-button';
 import { LiveScorebug } from '@/components/live-scorebug';
-import { AdminGameAdjustments } from '@/components/admin-game-adjustments';
 import { GameFlowChart } from '@/components/game-flow-chart';
 
 export const viewport: Viewport = {
@@ -154,7 +152,6 @@ export default async function GamePage({ params }: { params: { id: string } }) {
       (session?.user?.email && game.statTaker?.email && session.user.email === game.statTaker.email)
   );
   const canScore = isScorer;
-  const isAdmin = session?.user?.role === 'ADMIN';
   const canRenderFlowChart = !isLegacy && Boolean(game.homeTeamId && game.awayTeamId);
   const mergedTurns = game.turns.reduce<
     {
@@ -181,32 +178,6 @@ export default async function GamePage({ params }: { params: { id: string } }) {
     });
     return groups;
   }, []);
-  const adminPlayers = Array.from(
-    new Map(
-      game.lineups
-        .sort((a, b) => {
-          if (a.teamId === game.homeTeamId && b.teamId !== game.homeTeamId) return -1;
-          if (a.teamId !== game.homeTeamId && b.teamId === game.homeTeamId) return 1;
-          if (a.teamId === game.awayTeamId && b.teamId !== game.awayTeamId) return 1;
-          if (a.teamId !== game.awayTeamId && b.teamId === game.awayTeamId) return -1;
-          return a.orderIndex - b.orderIndex;
-        })
-        .map((slot) => [
-          slot.playerId,
-          {
-            id: slot.playerId,
-            name: slot.player.name ?? 'Unknown',
-            teamName:
-              slot.teamId === game.homeTeamId
-                ? game.homeTeam?.name ?? 'Home'
-                : slot.teamId === game.awayTeamId
-                  ? game.awayTeam?.name ?? 'Away'
-                  : 'Team'
-          }
-        ])
-    ).values()
-  );
-
   return (
     <div className="space-y-5 sm:space-y-6">
       <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-6">
@@ -319,30 +290,6 @@ export default async function GamePage({ params }: { params: { id: string } }) {
           <p className="mt-4 text-sm text-ash">No adjusted FGM data yet.</p>
         )}
       </section>
-
-      {isAdmin && (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-rose-700">Admin controls</h2>
-              <p className="text-xs text-rose-600">
-                Manage finalized score corrections or delete this game from season history.
-              </p>
-            </div>
-            <DeleteGameButton gameId={game.id} />
-          </div>
-          {game.status === 'FINAL' && !isLegacy && (
-            <div className="mt-3">
-              <AdminGameAdjustments
-                gameId={game.id}
-                players={adminPlayers}
-                homeTeamName={game.homeTeam?.name ?? 'Home'}
-                awayTeamName={game.awayTeam?.name ?? 'Away'}
-              />
-            </div>
-          )}
-        </section>
-      )}
 
       {canRenderFlowChart && (
         <GameFlowChart
