@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-const adjustmentSchema = z.object({
+const playerAdjustmentSchema = z.object({
   playerId: z.string().min(1),
   resultType: z.enum([
     ResultType.TOP_REGULAR,
@@ -17,6 +17,12 @@ const adjustmentSchema = z.object({
     ResultType.MISS
   ]),
   action: z.enum(['ADD', 'SUBTRACT'])
+});
+
+const sideAdjustmentSchema = z.object({
+  side: z.enum(['HOME', 'AWAY']),
+  action: z.enum(['PULL', 'ADD']),
+  count: z.coerce.number().int().min(1).max(25)
 });
 
 const isMake = (resultType: ResultType) =>
@@ -31,13 +37,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const json = await req.json();
-  const parsed = adjustmentSchema.safeParse(json);
-  if (!parsed.success) {
+  const json = await req.json().catch(() => null);
+  const parsedPlayer = playerAdjustmentSchema.safeParse(json);
+  const parsedSide = sideAdjustmentSchema.safeParse(json);
+  if (!parsedPlayer.success && !parsedSide.success) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
-  const { playerId, resultType, action } = parsed.data;
   const game = await prisma.game.findUnique({
     where: { id: params.id },
     include: {
@@ -59,6 +65,66 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Legacy games cannot be edited with this tool' }, { status: 400 });
   }
 
+  const beforeState = {
+    homeCupsRemaining: game.state.homeCupsRemaining,
+    awayCupsRemaining: game.state.awayCupsRemaining,
+    currentTurnNumber: game.state.currentTurnNumber,
+    phase: game.state.phase
+  };
+
+  if (parsedSide.success) {
+    const { side, action, count } = parsedSide.data;
+    const resultType = side === 'HOME' ? ResultType.PULL_HOME : ResultType.PULL_AWAY;
+    const cupsDelta = action === 'PULL' ? count : -count;
+    const targetBefore = side === 'HOME' ? game.state.homeCupsRemaining : game.state.awayCupsRemaining;
+    const targetAfter = Math.max(0, Math.min(100, targetBefore - cupsDelta));
+    const targetTeamId = side === 'HOME' ? game.homeTeamId : game.awayTeamId;
+    const offenseTeamId = side === 'HOME' ? game.awayTeamId : game.homeTeamId;
+
+    const createdEvent = await prisma.shotEvent.create({
+      data: {
+        gameId: game.id,
+        turnId: game.turns[0]?.id ?? null,
+        offenseTeamId,
+        defenseTeamId: targetTeamId,
+        shooterId: null,
+        resultType,
+        cupsDelta,
+        remainingCupsBefore: targetBefore,
+        remainingCupsAfter: targetAfter,
+        note: 'Admin side adjustment'
+      }
+    });
+
+    await recomputeGameState(game.id, { preserveFinalStatus: true });
+    const refreshedState = await prisma.gameState.findUnique({
+      where: { gameId: game.id },
+      select: { homeCupsRemaining: true, awayCupsRemaining: true, currentTurnNumber: true, phase: true }
+    });
+    await logAdminAudit({
+      actorUserId: session.user.id,
+      gameId: game.id,
+      action: action === 'PULL' ? 'GAME_SIDE_ADJUST_PULL' : 'GAME_SIDE_ADJUST_ADD',
+      entityType: 'ShotEvent',
+      entityId: createdEvent.id,
+      details: {
+        side,
+        count,
+        cupsDelta,
+        resultType,
+        gameStatus: game.status,
+        beforeState,
+        afterState: refreshedState
+      }
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (!parsedPlayer.success) {
+    return NextResponse.json({ error: 'Invalid player payload' }, { status: 400 });
+  }
+
+  const { playerId, resultType, action } = parsedPlayer.data;
   const lineupSlot = game.lineups.find((slot) => slot.playerId === playerId);
   if (!lineupSlot || !lineupSlot.teamId) {
     return NextResponse.json({ error: 'Player is not in this game lineup' }, { status: 400 });
@@ -83,7 +149,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         cupsDelta: delta,
         remainingCupsBefore: targetBefore,
         remainingCupsAfter: targetAfter,
-        note: 'Admin adjustment'
+        note: 'Admin shot adjustment'
       }
     });
 
@@ -103,62 +169,52 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         playerId,
         resultType,
         gameStatus: game.status,
-        beforeState: {
-          homeCupsRemaining: game.state.homeCupsRemaining,
-          awayCupsRemaining: game.state.awayCupsRemaining,
-          currentTurnNumber: game.state.currentTurnNumber,
-          phase: game.state.phase
-        },
-        afterState: refreshedState
-      }
-    });
-    return NextResponse.json({ ok: true });
-  } else {
-    const eventToDelete = await prisma.shotEvent.findFirst({
-      where: {
-        gameId: game.id,
-        shooterId: playerId,
-        resultType
-      },
-      orderBy: [{ timestamp: 'desc' }, { id: 'desc' }]
-    });
-
-    if (!eventToDelete) {
-      return NextResponse.json({ error: 'No matching shot to remove' }, { status: 404 });
-    }
-
-    await prisma.shotEvent.delete({ where: { id: eventToDelete.id } });
-    await recomputeGameState(game.id, { preserveFinalStatus: true });
-    const refreshedState = await prisma.gameState.findUnique({
-      where: { gameId: game.id },
-      select: { homeCupsRemaining: true, awayCupsRemaining: true, currentTurnNumber: true, phase: true }
-    });
-    await logAdminAudit({
-      actorUserId: session.user.id,
-      gameId: game.id,
-      action: 'GAME_SCORE_ADJUST_SUBTRACT',
-      entityType: 'ShotEvent',
-      entityId: eventToDelete.id,
-      details: {
-        playerId,
-        resultType,
-        gameStatus: game.status,
-        beforeState: {
-          homeCupsRemaining: game.state.homeCupsRemaining,
-          awayCupsRemaining: game.state.awayCupsRemaining,
-          currentTurnNumber: game.state.currentTurnNumber,
-          phase: game.state.phase
-        },
-        removedEvent: {
-          shooterId: eventToDelete.shooterId,
-          resultType: eventToDelete.resultType,
-          cupsDelta: eventToDelete.cupsDelta,
-          remainingCupsBefore: eventToDelete.remainingCupsBefore,
-          remainingCupsAfter: eventToDelete.remainingCupsAfter
-        },
+        beforeState,
         afterState: refreshedState
       }
     });
     return NextResponse.json({ ok: true });
   }
+
+  const eventToDelete = await prisma.shotEvent.findFirst({
+    where: {
+      gameId: game.id,
+      shooterId: playerId,
+      resultType
+    },
+    orderBy: [{ timestamp: 'desc' }, { id: 'desc' }]
+  });
+
+  if (!eventToDelete) {
+    return NextResponse.json({ error: 'No matching shot to remove' }, { status: 404 });
+  }
+
+  await prisma.shotEvent.delete({ where: { id: eventToDelete.id } });
+  await recomputeGameState(game.id, { preserveFinalStatus: true });
+  const refreshedState = await prisma.gameState.findUnique({
+    where: { gameId: game.id },
+    select: { homeCupsRemaining: true, awayCupsRemaining: true, currentTurnNumber: true, phase: true }
+  });
+  await logAdminAudit({
+    actorUserId: session.user.id,
+    gameId: game.id,
+    action: 'GAME_SCORE_ADJUST_SUBTRACT',
+    entityType: 'ShotEvent',
+    entityId: eventToDelete.id,
+    details: {
+      playerId,
+      resultType,
+      gameStatus: game.status,
+      beforeState,
+      removedEvent: {
+        shooterId: eventToDelete.shooterId,
+        resultType: eventToDelete.resultType,
+        cupsDelta: eventToDelete.cupsDelta,
+        remainingCupsBefore: eventToDelete.remainingCupsBefore,
+        remainingCupsAfter: eventToDelete.remainingCupsAfter
+      },
+      afterState: refreshedState
+    }
+  });
+  return NextResponse.json({ ok: true });
 }

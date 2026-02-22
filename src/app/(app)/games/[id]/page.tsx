@@ -6,10 +6,10 @@ import { advancedStats, baseRatingStats, boxScore, defaultMultipliers, winnerFro
 import { PlayerLink } from '@/components/player-link';
 import { getServerAuthSession } from '@/lib/auth';
 import { LiveBoxScores } from '@/components/live-box-scores';
-import { LivePlayByPlay } from '@/components/live-play-by-play';
 import { DeleteGameButton } from '@/components/delete-game-button';
 import { LiveScorebug } from '@/components/live-scorebug';
 import { AdminGameAdjustments } from '@/components/admin-game-adjustments';
+import { GameFlowChart } from '@/components/game-flow-chart';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -155,6 +155,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
   );
   const canScore = isScorer;
   const isAdmin = session?.user?.role === 'ADMIN';
+  const canRenderFlowChart = !isLegacy && Boolean(game.homeTeamId && game.awayTeamId);
   const mergedTurns = game.turns.reduce<
     {
       key: string;
@@ -319,72 +320,44 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         )}
       </section>
 
-      {!isLegacy && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="min-w-0 rounded-xl border border-garnet-100 bg-white/80 p-4">
-            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-base font-semibold text-ink sm:text-lg">Advanced</h2>
-              <p className="max-w-full text-[11px] text-ash sm:max-w-[260px] sm:text-xs sm:text-right">
-                Adjusted FGM uses base weights; tempo rating applies temporal scaling.
+      {isAdmin && (
+        <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-rose-700">Admin controls</h2>
+              <p className="text-xs text-rose-600">
+                Manage finalized score corrections or delete this game from season history.
               </p>
             </div>
-            <div className="mt-3 overflow-auto">
-              <table className="min-w-[420px] text-xs text-ink sm:min-w-full sm:text-sm">
-                <thead className="text-[11px] text-ash sm:text-xs">
-                  <tr>
-                    <th className="px-2 py-1 text-left">Player</th>
-                    <th className="px-2 py-1 text-center">Adjusted FGM</th>
-                    <th className="px-2 py-1 text-center">Rating / shot</th>
-                    <th className="px-2 py-1 text-center">Tempo rating</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from(baseRatings.entries()).map(([id, row]) => {
-                    const attempts = fullBox.get(id)?.attempts ?? row.attempts;
-                    const tempo = tempoRatings.get(id);
-                    return (
-                      <tr key={id} className="border-t border-garnet-100">
-                        <td className="px-2 py-1 text-ink">
-                          <PlayerLink
-                            id={id === 'unknown' ? null : id}
-                            name={row.name}
-                            className="text-ink hover:text-garnet-600"
-                          />
-                        </td>
-                        <td className="px-2 py-1 text-center">{row.weightedPoints.toFixed(2)}</td>
-                        <td className="px-2 py-1 text-center">
-                          {attempts > 0 ? (row.weightedPoints / attempts).toFixed(2) : '—'}
-                        </td>
-                        <td className="px-2 py-1 text-center">{tempo ? tempo.weightedPoints.toFixed(2) : '—'}</td>
-                      </tr>
-                    );
-                  })}
-                  {baseRatings.size === 0 && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-ash" colSpan={4}>
-                        No advanced stats yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DeleteGameButton gameId={game.id} />
           </div>
-
-          <div className="min-w-0 rounded-xl border border-garnet-100 bg-white/80 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-ink sm:text-lg">Play-by-play</h2>
-              <p className="text-xs text-ash">Tap undo in console to remove last event</p>
-            </div>
+          {game.status === 'FINAL' && !isLegacy && (
             <div className="mt-3">
-              <LivePlayByPlay gameId={game.id} initialEvents={game.events as any} />
+              <AdminGameAdjustments
+                gameId={game.id}
+                players={adminPlayers}
+                homeTeamName={game.homeTeam?.name ?? 'Home'}
+                awayTeamName={game.awayTeam?.name ?? 'Away'}
+              />
             </div>
-          </div>
-        </div>
+          )}
+        </section>
+      )}
+
+      {canRenderFlowChart && (
+        <GameFlowChart
+          gameId={game.id}
+          homeTeamId={game.homeTeamId as string}
+          awayTeamId={game.awayTeamId as string}
+          homeTeamName={game.homeTeam?.name ?? 'Home'}
+          awayTeamName={game.awayTeam?.name ?? 'Away'}
+          initialEvents={game.events as any}
+          isLive={showConsole}
+        />
       )}
 
       <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
-        <h2 className="text-base font-semibold text-ink sm:text-lg">Game flow</h2>
+        <h2 className="text-base font-semibold text-ink sm:text-lg">Game flow turns</h2>
         <div className="mt-3 max-h-96 space-y-3 overflow-y-auto pr-2 text-sm text-ink">
           {mergedTurns.length === 0 && <p className="text-ash">No events logged.</p>}
           {mergedTurns.map((turn, index) => (
@@ -414,22 +387,55 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         </div>
       </section>
 
-      {isAdmin && (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-rose-700">Admin controls</h2>
-              <p className="text-xs text-rose-600">
-                Manage finalized score corrections or delete this game from season history.
-              </p>
-            </div>
-            <DeleteGameButton gameId={game.id} />
+      {!isLegacy && (
+        <section className="min-w-0 rounded-xl border border-garnet-100 bg-white/80 p-4">
+          <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-base font-semibold text-ink sm:text-lg">Advanced</h2>
+            <p className="max-w-full text-[11px] text-ash sm:max-w-[260px] sm:text-xs sm:text-right">
+              Adjusted FGM uses base weights; tempo rating applies temporal scaling.
+            </p>
           </div>
-          {game.status === 'FINAL' && !isLegacy && (
-            <div className="mt-3">
-              <AdminGameAdjustments gameId={game.id} players={adminPlayers} />
-            </div>
-          )}
+          <div className="mt-3 overflow-auto">
+            <table className="min-w-[420px] text-xs text-ink sm:min-w-full sm:text-sm">
+              <thead className="text-[11px] text-ash sm:text-xs">
+                <tr>
+                  <th className="px-2 py-1 text-left">Player</th>
+                  <th className="px-2 py-1 text-center">Adjusted FGM</th>
+                  <th className="px-2 py-1 text-center">Rating / shot</th>
+                  <th className="px-2 py-1 text-center">Tempo rating</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from(baseRatings.entries()).map(([id, row]) => {
+                  const attempts = fullBox.get(id)?.attempts ?? row.attempts;
+                  const tempo = tempoRatings.get(id);
+                  return (
+                    <tr key={id} className="border-t border-garnet-100">
+                      <td className="px-2 py-1 text-ink">
+                        <PlayerLink
+                          id={id === 'unknown' ? null : id}
+                          name={row.name}
+                          className="text-ink hover:text-garnet-600"
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-center">{row.weightedPoints.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-center">
+                        {attempts > 0 ? (row.weightedPoints / attempts).toFixed(2) : '—'}
+                      </td>
+                      <td className="px-2 py-1 text-center">{tempo ? tempo.weightedPoints.toFixed(2) : '—'}</td>
+                    </tr>
+                  );
+                })}
+                {baseRatings.size === 0 && (
+                  <tr>
+                    <td className="px-2 py-3 text-center text-ash" colSpan={4}>
+                      No advanced stats yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </div>

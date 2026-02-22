@@ -16,7 +16,9 @@ const links = [
 export async function Header() {
   const session = await getServerAuthSession();
   const isAuthed = Boolean(session?.user);
-  const mobileLinks = [{ href: '/', label: 'Hub' }, ...links];
+  const isAdmin = session?.user?.role === 'ADMIN';
+  const navLinks = isAdmin ? [...links, { href: '/admin', label: 'Admin' }] : links;
+  const mobileLinks = [{ href: '/', label: 'Hub' }, ...navLinks];
 
   return (
     <header className="border-b border-garnet-100 bg-white/95">
@@ -30,7 +32,7 @@ export async function Header() {
           </Link>
           <MobileNav links={mobileLinks} />
           <nav className="hidden gap-3 text-sm text-ash sm:flex">
-            {links.map((link) => (
+            {navLinks.map((link) => (
               <Link key={link.href} href={link.href} className="hover:text-garnet-600">
                 {link.label}
               </Link>
