@@ -116,21 +116,37 @@ export function LiveBoxScores({
     return lineup.map((slot) => box.get(slot.player.id) ?? blankRow(slot.player.id, slot.player.name ?? 'Unknown'));
   };
 
+  const homeRows = orderRows(homeLineup);
+  const awayRows = orderRows(awayLineup);
+  const targetRowCount = Math.max(homeRows.length, awayRows.length);
+
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2">
       <TeamTable
         title={`${data.homeTeam?.name ?? 'Home'} box score`}
-        rows={orderRows(homeLineup)}
+        rows={homeRows}
+        targetRowCount={targetRowCount}
       />
       <TeamTable
         title={`${data.awayTeam?.name ?? 'Away'} box score`}
-        rows={orderRows(awayLineup)}
+        rows={awayRows}
+        targetRowCount={targetRowCount}
       />
     </div>
   );
 }
 
-function TeamTable({ title, rows }: { title: string; rows: BoxRow[] }) {
+function TeamTable({
+  title,
+  rows,
+  targetRowCount
+}: {
+  title: string;
+  rows: BoxRow[];
+  targetRowCount: number;
+}) {
+  const fillerCount = Math.max(0, targetRowCount - rows.length);
+
   return (
     <div className="overflow-hidden rounded-2xl border border-garnet-100 bg-white/85 shadow">
       <div className="border-b border-garnet-100 bg-gold-50 px-4 py-3">
@@ -171,6 +187,24 @@ function TeamTable({ title, rows }: { title: string; rows: BoxRow[] }) {
                 </td>
               </tr>
             ))}
+            {Array.from({ length: fillerCount }).map((_, idx) => {
+              const rowIndex = rows.length + idx;
+              return (
+                <tr
+                  key={`filler-${idx}`}
+                  className={`${rowIndex % 2 === 1 ? 'bg-gold-50/50' : 'bg-white'} hidden lg:table-row`}
+                >
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-3 py-2">&nbsp;</td>
+                </tr>
+              );
+            })}
             {rows.length === 0 && (
               <tr>
                 <td className="px-3 py-4 text-center text-ash" colSpan={8}>
