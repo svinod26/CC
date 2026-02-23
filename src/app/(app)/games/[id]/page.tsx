@@ -389,6 +389,24 @@ export default async function GamePage({ params }: { params: { id: string } }) {
   );
 }
 
+const TEAM_SHORT_NAMES: Record<string, string> = {
+  gargantuan: 'Garg',
+  'candice?': 'Cand'
+};
+
+function shortenTeamName(name: string) {
+  const trimmed = name.trim();
+  const mapped = TEAM_SHORT_NAMES[trimmed.toLowerCase()];
+  if (mapped) return mapped;
+  if (trimmed.length <= 10) return trimmed;
+  if (!trimmed.includes(' ')) return trimmed.slice(0, 4);
+  return trimmed;
+}
+
+function possessiveTeamLabel(name: string) {
+  return name.endsWith('s') ? `${name}'` : `${name}'s`;
+}
+
 function TeamScoreCard({
   label,
   made,
@@ -402,6 +420,7 @@ function TeamScoreCard({
   pulled: number;
   result: 'W' | 'L' | '';
 }) {
+  const sideTeam = possessiveTeamLabel(shortenTeamName(label));
   const resultStyles =
     result === 'W'
       ? 'border-emerald-200 bg-emerald-50/70 text-emerald-700'
@@ -416,7 +435,7 @@ function TeamScoreCard({
       </div>
       <div className="mt-2 text-xs uppercase text-ash">Cups made</div>
       <div className="text-2xl font-bold text-ink">{made}</div>
-      <div className="mt-1 text-xs text-ash">On your side: {remaining}</div>
+      <div className="mt-1 text-xs text-ash">On {sideTeam} side: {remaining}</div>
       <div className="mt-1 text-[11px] text-ash">Pulled cups: {pulled}</div>
     </div>
   );

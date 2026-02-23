@@ -29,6 +29,24 @@ const makeResultTypes = new Set<ResultType>([
   ResultType.BOTTOM_ISO
 ]);
 
+const TEAM_SHORT_NAMES: Record<string, string> = {
+  gargantuan: 'Garg',
+  'candice?': 'Cand'
+};
+
+function shortenTeamName(name: string) {
+  const trimmed = name.trim();
+  const mapped = TEAM_SHORT_NAMES[trimmed.toLowerCase()];
+  if (mapped) return mapped;
+  if (trimmed.length <= 10) return trimmed;
+  if (!trimmed.includes(' ')) return trimmed.slice(0, 4);
+  return trimmed;
+}
+
+function possessiveTeamLabel(name: string) {
+  return name.endsWith('s') ? `${name}'` : `${name}'s`;
+}
+
 export function LiveScorebug({ gameId, initialData }: { gameId: string; initialData: LiveGame }) {
   const { data } = useSWR<LiveGame>(`/api/games/${gameId}/state`, fetcher, {
     fallbackData: initialData,
@@ -114,6 +132,7 @@ function TeamScoreCard({
   pulled: number;
   result: string;
 }) {
+  const sideTeam = possessiveTeamLabel(shortenTeamName(label));
   const resultStyles =
     result === 'W'
       ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900'
@@ -127,7 +146,7 @@ function TeamScoreCard({
         <span className="truncate">{label}</span>
       </div>
       <div className="mt-2 text-2xl font-bold text-garnet-700">{made}</div>
-      <div className="mt-1 text-xs text-ash">On your side: {remaining}</div>
+      <div className="mt-1 text-xs text-ash">On {sideTeam} side: {remaining}</div>
       <div className="text-xs text-ash">Pulled cups: {pulled}</div>
     </div>
   );
