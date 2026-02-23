@@ -117,7 +117,7 @@ export function LiveBoxScores({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid items-start gap-4 lg:grid-cols-2">
       <TeamTable
         title={`${data.homeTeam?.name ?? 'Home'} box score`}
         rows={orderRows(homeLineup)}
