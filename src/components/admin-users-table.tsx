@@ -25,7 +25,7 @@ export function AdminUsersTable({ users }: { users: AdminUser[] }) {
   }, [users, query]);
 
   return (
-    <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
+    <div className="flex h-full min-w-0 flex-col rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-garnet-600">Accounts</p>
@@ -40,7 +40,7 @@ export function AdminUsersTable({ users }: { users: AdminUser[] }) {
         />
       </div>
 
-      <div className="mt-3 max-h-[440px] overflow-auto rounded-xl border border-garnet-100">
+      <div className="mt-3 min-h-[360px] flex-1 overflow-auto rounded-xl border border-garnet-100 sm:min-h-[520px]">
         <table className="min-w-full text-left text-sm">
           <thead className="sticky top-0 bg-parchment/90 text-xs uppercase tracking-wide text-ash">
             <tr>
@@ -54,7 +54,7 @@ export function AdminUsersTable({ users }: { users: AdminUser[] }) {
             {filtered.map((user) => (
               <tr key={user.id} className="border-t border-garnet-100 bg-white/80">
                 <td className="px-3 py-2 text-ink">{user.name ?? '—'}</td>
-                <td className="px-3 py-2 text-garnet-700">{user.email}</td>
+                <td className="break-all px-3 py-2 text-garnet-700">{user.email}</td>
                 <td className="px-3 py-2 text-ash">{user.role}</td>
                 <td className="px-3 py-2 text-ash">{new Date(user.createdAt).toLocaleDateString()}</td>
               </tr>

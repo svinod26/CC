@@ -22,7 +22,7 @@ export function AdminAuditLog() {
   const logs = data?.logs ?? [];
 
   return (
-    <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
+    <section className="min-w-0 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs uppercase tracking-wide text-garnet-600">Audit</p>
@@ -50,7 +50,7 @@ export function AdminAuditLog() {
                 <td className="px-3 py-2 text-ink">
                   {log.actorName ?? 'Admin'}
                   {log.actorEmail ? (
-                    <span className="ml-1 text-xs text-ash">({log.actorEmail})</span>
+                    <span className="ml-1 break-all text-xs text-ash">({log.actorEmail})</span>
                   ) : null}
                 </td>
                 <td className="px-3 py-2 text-ash">{log.gameLabel ?? '—'}</td>

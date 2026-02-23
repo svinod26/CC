@@ -68,7 +68,7 @@ export default async function AdminPage({
   });
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className="w-full min-w-0 space-y-5 overflow-x-hidden sm:space-y-6">
       <section className="rounded-3xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -87,7 +87,7 @@ export default async function AdminPage({
         </div>
       </section>
 
-      <section className="grid items-start gap-4 lg:grid-cols-[1.2fr_1fr]">
+      <section className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <AdminGameWorkbench games={gameOptions} initialGameId={selectedGameId} />
         <AdminUsersTable
           users={users.map((user) => ({

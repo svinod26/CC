@@ -161,7 +161,7 @@ export function AdminGameWorkbench({
   };
 
   return (
-    <section className="space-y-3 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
+    <section className="h-full min-w-0 space-y-3 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       <div>
         <p className="text-xs uppercase tracking-wide text-garnet-600">Corrections</p>
         <h2 className="text-lg font-semibold text-ink">Game score editor</h2>
@@ -180,7 +180,7 @@ export function AdminGameWorkbench({
         />
       </label>
 
-      <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-garnet-100 bg-parchment/50 p-2">
+      <div className="max-h-56 space-y-1 overflow-y-auto overflow-x-hidden rounded-xl border border-garnet-100 bg-parchment/50 p-2">
         {filteredGames.map((game) => (
           <button
             key={game.id}
@@ -208,7 +208,7 @@ export function AdminGameWorkbench({
       )}
 
       {selectedGameId && (
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <div className="rounded-xl border border-garnet-100 bg-parchment/70 p-3">
             <p className="text-sm font-semibold text-ink">
               {snapshot?.game.homeTeamName ?? 'Home'} vs {snapshot?.game.awayTeamName ?? 'Away'}
@@ -229,7 +229,7 @@ export function AdminGameWorkbench({
           <div className="rounded-xl border border-garnet-100 bg-white/90 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-garnet-600">Per-player cups (before adjust)</p>
             <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-garnet-100">
-              <table className="min-w-full text-left text-sm">
+              <table className="min-w-[680px] text-left text-sm sm:min-w-full">
                 <thead className="sticky top-0 bg-parchment/90 text-[11px] uppercase tracking-wide text-ash">
                   <tr>
                     <th className="px-2 py-2">Player</th>
@@ -268,13 +268,13 @@ export function AdminGameWorkbench({
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+            <div className="min-w-0 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Player shot correction</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <label className="space-y-1 text-xs text-ash">
                   Player
                   <select
-                    className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
                     value={playerId}
                     onChange={(event) => setPlayerId(event.target.value)}
                     disabled={isSubmitting}
@@ -289,7 +289,7 @@ export function AdminGameWorkbench({
                 <label className="space-y-1 text-xs text-ash">
                   Shot type
                   <select
-                    className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
                     value={resultType}
                     onChange={(event) => setResultType(event.target.value as ResultType)}
                     disabled={isSubmitting}
@@ -302,12 +302,12 @@ export function AdminGameWorkbench({
                   </select>
                 </label>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => submitPlayer('ADD')}
                   disabled={isSubmitting || !playerId}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                 >
                   Add shot
                 </button>
@@ -315,20 +315,20 @@ export function AdminGameWorkbench({
                   type="button"
                   onClick={() => submitPlayer('SUBTRACT')}
                   disabled={isSubmitting || !playerId}
-                  className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
                 >
                   Remove shot
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+            <div className="min-w-0 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Side cup correction</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_120px]">
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <label className="space-y-1 text-xs text-ash">
                   Side
                   <select
-                    className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
                     value={side}
                     onChange={(event) => setSide(event.target.value as 'HOME' | 'AWAY')}
                     disabled={isSubmitting}
@@ -345,17 +345,17 @@ export function AdminGameWorkbench({
                     max={25}
                     value={sideCount}
                     onChange={(event) => setSideCount(Number(event.target.value))}
-                    className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
                     disabled={isSubmitting}
                   />
                 </label>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => submitSide('PULL')}
                   disabled={isSubmitting}
-                  className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
                 >
                   Pull cups
                 </button>
@@ -363,7 +363,7 @@ export function AdminGameWorkbench({
                   type="button"
                   onClick={() => submitSide('ADD')}
                   disabled={isSubmitting}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                 >
                   Add cups
                 </button>
