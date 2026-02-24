@@ -59,8 +59,12 @@ export default async function GamePage({ params }: { params: { id: string } }) {
 
   const homeRemaining = game.state?.homeCupsRemaining ?? 100;
   const awayRemaining = game.state?.awayCupsRemaining ?? 100;
-  const homeMade = Math.max(0, 100 - awayRemaining);
-  const awayMade = Math.max(0, 100 - homeRemaining);
+  const homeSideRemaining = isLegacy ? awayRemaining : homeRemaining;
+  const awaySideRemaining = isLegacy ? homeRemaining : awayRemaining;
+  const homeOpponentRemaining = isLegacy ? homeRemaining : awayRemaining;
+  const awayOpponentRemaining = isLegacy ? awayRemaining : homeRemaining;
+  const homeMade = Math.max(0, 100 - homeOpponentRemaining);
+  const awayMade = Math.max(0, 100 - awayOpponentRemaining);
   const hasResult = game.state !== null && game.state !== undefined;
   const winner = hasResult
     ? winnerFromGameState(game.state, {
@@ -204,14 +208,14 @@ export default async function GamePage({ params }: { params: { id: string } }) {
                 <TeamScoreCard
                   label={game.homeTeam?.name ?? 'Home'}
                   made={homeMade}
-                  remaining={homeRemaining}
+                  remaining={homeSideRemaining}
                   pulled={pulledHome}
                   result={homeWon ? 'W' : awayWon ? 'L' : ''}
                 />
                 <TeamScoreCard
                   label={game.awayTeam?.name ?? 'Away'}
                   made={awayMade}
-                  remaining={awayRemaining}
+                  remaining={awaySideRemaining}
                   pulled={pulledAway}
                   result={awayWon ? 'W' : homeWon ? 'L' : ''}
                 />

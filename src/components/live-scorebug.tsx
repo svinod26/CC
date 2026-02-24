@@ -55,8 +55,13 @@ export function LiveScorebug({ gameId, initialData }: { gameId: string; initialD
 
   if (!data) return null;
 
-  const homeRemaining = data.state?.homeCupsRemaining ?? 100;
-  const awayRemaining = data.state?.awayCupsRemaining ?? 100;
+  const rawHomeRemaining = data.state?.homeCupsRemaining ?? 100;
+  const rawAwayRemaining = data.state?.awayCupsRemaining ?? 100;
+  const isLegacy = data.statsSource === StatsSource.LEGACY;
+  const homeRemaining = isLegacy ? rawAwayRemaining : rawHomeRemaining;
+  const awayRemaining = isLegacy ? rawHomeRemaining : rawAwayRemaining;
+  const homeOpponentRemaining = isLegacy ? rawHomeRemaining : rawAwayRemaining;
+  const awayOpponentRemaining = isLegacy ? rawAwayRemaining : rawHomeRemaining;
   const trackedMakesByTeam = data.events.reduce(
     (acc, event) => {
       if (!makeResultTypes.has(event.resultType) || !event.offenseTeamId) return acc;
@@ -70,11 +75,11 @@ export function LiveScorebug({ gameId, initialData }: { gameId: string; initialD
   const homeMade =
     data.statsSource === StatsSource.TRACKED && hasOffenseScopedMakes
       ? trackedMakesByTeam.home
-      : Math.max(0, 100 - awayRemaining);
+      : Math.max(0, 100 - homeOpponentRemaining);
   const awayMade =
     data.statsSource === StatsSource.TRACKED && hasOffenseScopedMakes
       ? trackedMakesByTeam.away
-      : Math.max(0, 100 - homeRemaining);
+      : Math.max(0, 100 - awayOpponentRemaining);
   const winner = winnerFromGameState(data.state, {
     statsSource: data.statsSource,
     homeTeamId: data.homeTeam?.id,
