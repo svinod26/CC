@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 
 type TeamWithRoster = Team & { rosters: (TeamRoster & { player: Player })[] };
+const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
 export function GameSetupForm({
   teams,
@@ -44,7 +45,7 @@ export function GameSetupForm({
 
   const playerLookup = useMemo(() => {
     const map = new Map<string, Player>();
-    players.forEach((player) => map.set(player.name.toLowerCase(), player));
+    players.forEach((player) => map.set(normalizeName(player.name).toLowerCase(), player));
     return map;
   }, [players]);
 
@@ -79,8 +80,14 @@ export function GameSetupForm({
     e.preventDefault();
     setError(null);
     const isLeague = gameType === 'LEAGUE';
-    const lineupIds = isLeague ? homeLineup : homeLineupNames.map((name) => playerLookup.get(name.toLowerCase())?.id ?? '');
-    const awayIds = isLeague ? awayLineup : awayLineupNames.map((name) => playerLookup.get(name.toLowerCase())?.id ?? '');
+    const cleanHomeNames = homeLineupNames.map((name) => normalizeName(name));
+    const cleanAwayNames = awayLineupNames.map((name) => normalizeName(name));
+    const lineupIds = isLeague
+      ? homeLineup
+      : cleanHomeNames.map((name) => playerLookup.get(name.toLowerCase())?.id ?? '');
+    const awayIds = isLeague
+      ? awayLineup
+      : cleanAwayNames.map((name) => playerLookup.get(name.toLowerCase())?.id ?? '');
 
     if (isLeague) {
       if (!homeTeamId || !awayTeamId) {
@@ -106,14 +113,29 @@ export function GameSetupForm({
         setError('Home and away teams must differ.');
         return;
       }
+
+      if (cleanHomeNames.some((name) => !name) || cleanAwayNames.some((name) => !name)) {
+        setError('Set all six shooters for each side.');
+        return;
+      }
+      if (
+        new Set(cleanHomeNames.map((name) => name.toLowerCase())).size !== cleanHomeNames.length ||
+        new Set(cleanAwayNames.map((name) => name.toLowerCase())).size !== cleanAwayNames.length
+      ) {
+        setError('Each lineup must have unique shooters.');
+        return;
+      }
     }
 
-    if (lineupIds.some((id) => !id) || awayIds.some((id) => !id)) {
+    if (isLeague && (lineupIds.some((id) => !id) || awayIds.some((id) => !id))) {
       setError('Set all six shooters for each side.');
       return;
     }
 
-    if (new Set(lineupIds).size !== lineupIds.length || new Set(awayIds).size !== awayIds.length) {
+    if (
+      isLeague &&
+      (new Set(lineupIds).size !== lineupIds.length || new Set(awayIds).size !== awayIds.length)
+    ) {
       setError('Each lineup must have unique shooters.');
       return;
     }
@@ -128,7 +150,9 @@ export function GameSetupForm({
       awayTeamName: !isLeague ? awayTeamName : undefined,
       week: isLeague ? week : undefined,
       homeLineupIds: lineupIds,
-      awayLineupIds: awayIds
+      awayLineupIds: awayIds,
+      homeLineupNames: !isLeague ? cleanHomeNames : undefined,
+      awayLineupNames: !isLeague ? cleanAwayNames : undefined
     };
 
     const res = await fetch('/api/games', {

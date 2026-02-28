@@ -18,7 +18,9 @@ const schema = z.object({
   scheduledAt: z.string().optional(),
   week: z.number().int().positive().optional(),
   homeLineupIds: z.array(z.string()).default([]),
-  awayLineupIds: z.array(z.string()).default([])
+  awayLineupIds: z.array(z.string()).default([]),
+  homeLineupNames: z.array(z.string()).default([]),
+  awayLineupNames: z.array(z.string()).default([])
 });
 
 export async function POST(req: Request) {
@@ -64,8 +66,11 @@ export async function POST(req: Request) {
   let game;
   try {
     game = await prisma.$transaction(async (tx) => {
+      const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
       let homeTeamId = data.homeTeamId;
       let awayTeamId = data.awayTeamId;
+      let resolvedHomeLineupIds = data.homeLineupIds;
+      let resolvedAwayLineupIds = data.awayLineupIds;
 
       if (data.type === GameType.EXHIBITION) {
         const homeName = (data.homeTeamName ?? '').trim() || 'Exhibition Home';
@@ -99,6 +104,67 @@ export async function POST(req: Request) {
       }
       if (data.type === GameType.LEAGUE && !data.week) {
         throw new Error('League games require a week selection.');
+      }
+
+      if (data.type === GameType.LEAGUE) {
+        if (
+          resolvedHomeLineupIds.length !== 6 ||
+          resolvedAwayLineupIds.length !== 6 ||
+          resolvedHomeLineupIds.some((id) => !id) ||
+          resolvedAwayLineupIds.some((id) => !id)
+        ) {
+          throw new Error('Set all six shooters for each side.');
+        }
+      } else {
+        const resolveExhibitionLineupIds = async (
+          lineupIds: string[],
+          lineupNames: string[]
+        ) => {
+          if (lineupNames.length !== 6) {
+            throw new Error('Set all six shooters for each side.');
+          }
+          const resolvedIds: string[] = [];
+          for (let idx = 0; idx < lineupNames.length; idx += 1) {
+            const cleanedName = normalizeName(lineupNames[idx] ?? '');
+            if (!cleanedName) {
+              throw new Error('Set all six shooters for each side.');
+            }
+
+            const explicitId = lineupIds[idx];
+            if (explicitId) {
+              resolvedIds.push(explicitId);
+              continue;
+            }
+
+            const existingPlayer = await tx.player.findFirst({
+              where: { name: { equals: cleanedName, mode: 'insensitive' } },
+              orderBy: { createdAt: 'asc' }
+            });
+
+            if (existingPlayer) {
+              resolvedIds.push(existingPlayer.id);
+              continue;
+            }
+
+            const createdPlayer = await tx.player.create({
+              data: { name: cleanedName }
+            });
+            resolvedIds.push(createdPlayer.id);
+          }
+          if (new Set(resolvedIds).size !== resolvedIds.length) {
+            throw new Error('Each lineup must have unique shooters.');
+          }
+          return resolvedIds;
+        };
+
+        resolvedHomeLineupIds = await resolveExhibitionLineupIds(
+          data.homeLineupIds,
+          data.homeLineupNames
+        );
+        resolvedAwayLineupIds = await resolveExhibitionLineupIds(
+          data.awayLineupIds,
+          data.awayLineupNames
+        );
       }
 
       let scheduleEntry: { id: string } | null = null;
@@ -155,13 +221,13 @@ export async function POST(req: Request) {
       });
 
       const lineupCreates = [
-        ...data.homeLineupIds.map((playerId, index) => ({
+        ...resolvedHomeLineupIds.map((playerId, index) => ({
           gameId: createdGame.id,
           teamId: homeTeamId,
           playerId,
           orderIndex: index
         })),
-        ...data.awayLineupIds.map((playerId, index) => ({
+        ...resolvedAwayLineupIds.map((playerId, index) => ({
           gameId: createdGame.id,
           teamId: awayTeamId,
           playerId,
@@ -179,7 +245,7 @@ export async function POST(req: Request) {
           offenseTeamId: homeTeamId,
           turnIndex: 1,
           isBonus: false,
-          shootersJson: data.homeLineupIds
+          shootersJson: resolvedHomeLineupIds
         }
       });
 
