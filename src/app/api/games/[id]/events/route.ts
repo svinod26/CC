@@ -198,6 +198,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const stuffMakesThisTurn = turnEvents.filter(
       (event) => isMakeResult(event.resultType) && event.remainingCupsBefore === 0
     ).length;
+    const missesThisTurn = turnEvents.filter((event) => event.resultType === ResultType.MISS).length;
 
     let shooterIndex = isPull ? game.state!.currentShooterIndex : shotsThisTurn;
     let possessionTeamId = offenseTeamId;
@@ -212,11 +213,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     } else if (phase === 'REDEMPTION') {
       const opponentRemaining = offenseTeamId === game.homeTeamId ? nextAway : nextHome;
       if (!isPull) {
-        if (!isMake) {
-          shooterIndex = game.state!.currentShooterIndex + 1;
-        } else {
-          shooterIndex = game.state!.currentShooterIndex;
-        }
+        // In redemption, a shooter stays on until they miss.
+        shooterIndex = missesThisTurn;
       }
 
       if (opponentRemaining <= 0 && !isMake) {

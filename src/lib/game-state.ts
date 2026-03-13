@@ -112,21 +112,9 @@ export async function recomputeGameState(gameId: string, options: RecomputeOptio
     }
 
     let currentTurnNumber = 1;
-    let currentShooterIndex = 0;
 
     for (const turn of turns) {
-      const offenseId = turn.offenseTeamId ?? game.homeTeamId;
-      const shotsThisTurn = turn.events.filter((event) => !isPullResult(event.resultType)).length;
-
       currentTurnNumber = turn.turnIndex;
-      const shooterIds = Array.isArray(turn.shootersJson) ? (turn.shootersJson as string[]) : [];
-      const lineupLength =
-        shooterIds.length ||
-        game.lineups
-          .filter((lineup) => lineup.teamId === offenseId)
-          .sort((a, b) => a.orderIndex - b.orderIndex).length ||
-        6;
-      currentShooterIndex = shotsThisTurn % Math.max(lineupLength, 1);
     }
 
     const lastTurn = turns[turns.length - 1];
@@ -149,6 +137,23 @@ export async function recomputeGameState(gameId: string, options: RecomputeOptio
     const possessionTeamId = preserveOvertimeWinner
       ? game.state.possessionTeamId
       : derivedPossessionTeamId;
+    const lastOffenseId = lastTurn?.offenseTeamId ?? game.homeTeamId;
+    const lastShooterIds = Array.isArray(lastTurn?.shootersJson)
+      ? ((lastTurn?.shootersJson as string[]) ?? [])
+      : [];
+    const lastLineupLength =
+      lastShooterIds.length ||
+      game.lineups
+        .filter((lineup) => lineup.teamId === lastOffenseId)
+        .sort((a, b) => a.orderIndex - b.orderIndex).length ||
+      6;
+    const normalizedLastLineupLength = Math.max(lastLineupLength, 1);
+    const lastTurnShots = (lastTurn?.events ?? []).filter((event) => !isPullResult(event.resultType)).length;
+    const lastTurnMisses = (lastTurn?.events ?? []).filter((event) => event.resultType === ResultType.MISS).length;
+    const currentShooterIndex =
+      nextPhase === GamePhase.REDEMPTION
+        ? lastTurnMisses % normalizedLastLineupLength
+        : lastTurnShots % normalizedLastLineupLength;
 
     await tx.gameState.updateMany({
       where: { gameId },
