@@ -51,10 +51,36 @@ const defaultRecap = (input: RecapInput) => {
   return `Week ${input.week} recap: ${topLine} ${gameLines}`.trim();
 };
 
-export async function getWeeklyRecap(input: RecapInput) {
+type RecapResult = {
+  text: string;
+  source: 'fallback' | 'gemini';
+  reason: 'missing-key' | 'gemini-error' | 'ok';
+};
+
+// The recap runs on every homepage render; cache per input so we only call
+// Gemini when the week's data actually changes (or the entry expires).
+const RECAP_TTL_MS = 10 * 60 * 1000;
+const recapCache = new Map<string, { result: RecapResult; expires: number }>();
+
+export async function getWeeklyRecap(input: RecapInput): Promise<RecapResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return { text: defaultRecap(input), source: 'fallback' as const, reason: 'missing-key' as const };
+  }
+
+  const cacheKey = JSON.stringify({
+    week: input.week,
+    games: input.games.map((game) => [
+      game.id,
+      game.state?.homeCupsRemaining,
+      game.state?.awayCupsRemaining,
+      game.state?.status
+    ]),
+    top: input.topPerformers.map((player) => [player.name, player.makes])
+  });
+  const cachedEntry = recapCache.get(cacheKey);
+  if (cachedEntry && cachedEntry.expires > Date.now()) {
+    return cachedEntry.result;
   }
 
   const weekLabel = input.week ? `Week ${input.week}` : 'Latest week';
@@ -86,13 +112,18 @@ Top performers: ${topLines.join(' | ') || 'No top performers'}
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 120 }
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 250,
+            // 2.5-flash is a thinking model; without this the token budget goes to thinking.
+            thinkingConfig: { thinkingBudget: 0 }
+          }
         })
       }
     );
@@ -110,7 +141,10 @@ Top performers: ${topLines.join(' | ') || 'No top performers'}
       return { text: defaultRecap(input), source: 'fallback' as const, reason: 'gemini-error' as const };
     }
 
-    return { text, source: 'gemini' as const, reason: 'ok' as const };
+    const result: RecapResult = { text, source: 'gemini' as const, reason: 'ok' as const };
+    if (recapCache.size > 50) recapCache.clear();
+    recapCache.set(cacheKey, { result, expires: Date.now() + RECAP_TTL_MS });
+    return result;
   } catch (error) {
     return { text: defaultRecap(input), source: 'fallback' as const, reason: 'gemini-error' as const };
   }

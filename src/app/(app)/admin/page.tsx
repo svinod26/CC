@@ -1,5 +1,6 @@
 import { getServerAuthSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { formatGameType } from '@/lib/format';
 import { AdminAuditLog } from '@/components/admin-audit-log';
 import { AdminGameWorkbench } from '@/components/admin-game-workbench';
 import { AdminUsersTable } from '@/components/admin-users-table';
@@ -58,7 +59,7 @@ export default async function AdminPage({
       : games[0]?.id ?? null;
 
   const gameOptions = games.map((game) => {
-    const week = game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : game.type;
+    const week = game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : formatGameType(game.type);
     const matchup = `${game.homeTeam?.name ?? 'Home'} vs ${game.awayTeam?.name ?? 'Away'}`;
     return {
       id: game.id,

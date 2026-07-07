@@ -63,14 +63,75 @@ export async function POST(req: Request) {
   const scheduledDate = data.scheduledAt ? new Date(data.scheduledAt) : null;
   const status = scheduledDate && scheduledDate.getTime() > Date.now() ? GameStatus.SCHEDULED : GameStatus.IN_PROGRESS;
 
+  const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
+
   let game;
   try {
+    // Resolve exhibition shooters before opening the transaction — looking up
+    // or creating up to 12 players is too many round-trips to hold a
+    // transaction open for on a remote database.
+    let resolvedHomeLineupIds = data.homeLineupIds;
+    let resolvedAwayLineupIds = data.awayLineupIds;
+
+    if (data.type === GameType.EXHIBITION) {
+      const resolveExhibitionLineupIds = async (
+        lineupIds: string[],
+        lineupNames: string[]
+      ) => {
+        if (lineupNames.length !== 6) {
+          throw new Error('Set all six shooters for each side.');
+        }
+        const resolvedIds: string[] = [];
+        for (let idx = 0; idx < lineupNames.length; idx += 1) {
+          const cleanedName = normalizeName(lineupNames[idx] ?? '');
+          if (!cleanedName) {
+            throw new Error('Set all six shooters for each side.');
+          }
+
+          const explicitId = lineupIds[idx];
+          if (explicitId) {
+            resolvedIds.push(explicitId);
+            continue;
+          }
+
+          const existingPlayer = await prisma.player.findFirst({
+            where: { name: { equals: cleanedName, mode: 'insensitive' } },
+            orderBy: { createdAt: 'asc' }
+          });
+
+          if (existingPlayer) {
+            resolvedIds.push(existingPlayer.id);
+            continue;
+          }
+
+          const createdPlayer = await prisma.player.create({
+            data: { name: cleanedName }
+          });
+          resolvedIds.push(createdPlayer.id);
+        }
+        if (new Set(resolvedIds).size !== resolvedIds.length) {
+          throw new Error('Each lineup must have unique shooters.');
+        }
+        return resolvedIds;
+      };
+
+      resolvedHomeLineupIds = await resolveExhibitionLineupIds(
+        data.homeLineupIds,
+        data.homeLineupNames
+      );
+      resolvedAwayLineupIds = await resolveExhibitionLineupIds(
+        data.awayLineupIds,
+        data.awayLineupNames
+      );
+    }
+
+    if (resolvedHomeLineupIds.some((id) => resolvedAwayLineupIds.includes(id))) {
+      throw new Error('A player can’t be in both lineups.');
+    }
+
     game = await prisma.$transaction(async (tx) => {
-      const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
       let homeTeamId = data.homeTeamId;
       let awayTeamId = data.awayTeamId;
-      let resolvedHomeLineupIds = data.homeLineupIds;
-      let resolvedAwayLineupIds = data.awayLineupIds;
 
       if (data.type === GameType.EXHIBITION) {
         const homeName = (data.homeTeamName ?? '').trim() || 'Exhibition Home';
@@ -115,56 +176,6 @@ export async function POST(req: Request) {
         ) {
           throw new Error('Set all six shooters for each side.');
         }
-      } else {
-        const resolveExhibitionLineupIds = async (
-          lineupIds: string[],
-          lineupNames: string[]
-        ) => {
-          if (lineupNames.length !== 6) {
-            throw new Error('Set all six shooters for each side.');
-          }
-          const resolvedIds: string[] = [];
-          for (let idx = 0; idx < lineupNames.length; idx += 1) {
-            const cleanedName = normalizeName(lineupNames[idx] ?? '');
-            if (!cleanedName) {
-              throw new Error('Set all six shooters for each side.');
-            }
-
-            const explicitId = lineupIds[idx];
-            if (explicitId) {
-              resolvedIds.push(explicitId);
-              continue;
-            }
-
-            const existingPlayer = await tx.player.findFirst({
-              where: { name: { equals: cleanedName, mode: 'insensitive' } },
-              orderBy: { createdAt: 'asc' }
-            });
-
-            if (existingPlayer) {
-              resolvedIds.push(existingPlayer.id);
-              continue;
-            }
-
-            const createdPlayer = await tx.player.create({
-              data: { name: cleanedName }
-            });
-            resolvedIds.push(createdPlayer.id);
-          }
-          if (new Set(resolvedIds).size !== resolvedIds.length) {
-            throw new Error('Each lineup must have unique shooters.');
-          }
-          return resolvedIds;
-        };
-
-        resolvedHomeLineupIds = await resolveExhibitionLineupIds(
-          data.homeLineupIds,
-          data.homeLineupNames
-        );
-        resolvedAwayLineupIds = await resolveExhibitionLineupIds(
-          data.awayLineupIds,
-          data.awayLineupNames
-        );
       }
 
       let scheduleEntry: { id: string } | null = null;
@@ -257,7 +268,7 @@ export async function POST(req: Request) {
       }
 
       return createdGame;
-    });
+    }, { timeout: 15000 });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message ?? 'Failed to create game' }, { status: 400 });
   }

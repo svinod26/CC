@@ -48,7 +48,11 @@ type BoxRow = {
   misses: number;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to load game state');
+  return res.json();
+};
 
 const buildLegacyBox = (stats: GameStatePayload['legacyStats']) => {
   const map = new Map<string, BoxRow>();

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { ResultType } from '@prisma/client';
 import { defaultMultipliers, isMake, isShot, winnerFromGameState } from '@/lib/stats';
+import { formatGameStatus, formatGameType } from '@/lib/format';
 import { getWeeklyRecap } from '@/lib/ai';
 import { resolveSeasonSelection } from '@/lib/season';
 
@@ -326,7 +327,7 @@ export default async function HomePage() {
                 Live now: {liveGame.homeTeam?.name ?? 'Home'} vs {liveGame.awayTeam?.name ?? 'Away'}
               </span>
               <span className="shrink-0 text-xs uppercase tracking-wide text-emerald-700">
-                {liveGame.scheduleEntry?.week ? `Week ${liveGame.scheduleEntry.week}` : liveGame.type}
+                {liveGame.scheduleEntry?.week ? `Week ${liveGame.scheduleEntry.week}` : formatGameType(liveGame.type)}
               </span>
             </Link>
           ))}
@@ -347,10 +348,10 @@ export default async function HomePage() {
                 Start game
               </Link>
               <Link
-                href={session ? '/dashboard' : '/signin'}
+                href="/dashboard"
                 className="rounded-full border border-garnet-200 px-5 py-2 text-sm font-semibold text-garnet-600 hover:bg-gold-100"
               >
-                {session ? 'My dashboard' : 'Sign in'}
+                My dashboard
               </Link>
             </div>
           </div>
@@ -400,7 +401,7 @@ export default async function HomePage() {
                     );
                   })()}
                   <p className="text-xs uppercase tracking-wide text-ash">
-                    {game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : game.status}
+                    {game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : formatGameStatus(game.status)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -498,12 +499,7 @@ export default async function HomePage() {
         <div className="rounded-2xl border border-garnet-100 bg-white/85 p-3 shadow sm:p-5">
           <p className="text-sm uppercase tracking-wide text-garnet-600">Your latest</p>
           <h2 className="mt-2 text-xl font-semibold text-ink">Recent performances</h2>
-          {!session && (
-            <p className="mt-4 text-sm text-ash">
-              Sign in to see your personal game log and advanced stats.
-            </p>
-          )}
-          {session && !player && (
+          {!player && (
             <p className="mt-4 text-sm text-ash">
               We couldn’t match your account email to a player record yet. Ask an admin to link your email in the roster
               import.

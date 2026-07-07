@@ -2,8 +2,6 @@ import { getServerAuthSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { PlayerDashboard } from '@/components/player-dashboard';
 import { resolveSeasonSelection } from '@/lib/season';
-import { SeasonSelect } from '@/components/season-select';
-import { GameTypeSelect } from '@/components/game-type-select';
 import { GameType } from '@prisma/client';
 
 export default async function DashboardPage({

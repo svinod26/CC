@@ -25,17 +25,40 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
   }
 
-  await prisma.$transaction([
-    prisma.schedule.updateMany({
+  await prisma.$transaction(async (tx) => {
+    await tx.schedule.updateMany({
       where: { gameId: params.id },
       data: { gameId: null }
-    }),
-    prisma.game.delete({ where: { id: params.id } })
-  ]);
+    });
+    await tx.game.delete({ where: { id: params.id } });
+
+    // Exhibition games create ad-hoc teams (no season); remove them if this
+    // was the only game referencing them so they don't pile up.
+    const adhocTeamIds = [existing.homeTeamId, existing.awayTeamId].filter(
+      (id): id is string => Boolean(id)
+    );
+    if (existing.type === 'EXHIBITION' && adhocTeamIds.length > 0) {
+      await tx.team.deleteMany({
+        where: {
+          id: { in: adhocTeamIds },
+          seasonId: null,
+          rosters: { none: {} },
+          homeGames: { none: {} },
+          awayGames: { none: {} },
+          scheduleHome: { none: {} },
+          scheduleAway: { none: {} },
+          legacyStats: { none: {} },
+          legacyTeamStats: { none: {} }
+        }
+      });
+    }
+  });
 
   await logAdminAudit({
     actorUserId: session.user.id,
-    gameId: existing.id,
+    // The game row is gone, so the FK reference must stay null; the id is
+    // preserved in entityId/details below.
+    gameId: null,
     action: 'GAME_DELETE',
     entityType: 'Game',
     entityId: existing.id,

@@ -3,12 +3,14 @@ import type { Viewport } from 'next';
 import { prisma } from '@/lib/prisma';
 import { LiveConsole } from '@/components/live-console';
 import { winnerFromGameState } from '@/lib/stats';
+import { formatGameStatus, formatShotResult } from '@/lib/format';
 import { PlayerLink } from '@/components/player-link';
 import { getServerAuthSession } from '@/lib/auth';
 import { LiveBoxScores } from '@/components/live-box-scores';
 import { LiveScorebug } from '@/components/live-scorebug';
 import { GameFlowChart } from '@/components/game-flow-chart';
 import { LiveGameInsights } from '@/components/live-game-insights';
+import { DeleteGameButton } from '@/components/delete-game-button';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -96,6 +98,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
       (session?.user?.email && game.statTaker?.email && session.user.email === game.statTaker.email)
   );
   const canScore = isScorer;
+  const isAdmin = session?.user?.role === 'ADMIN';
   const canRenderFlowChart = !isLegacy && Boolean(game.homeTeamId && game.awayTeamId);
   const mergedTurns = game.turns.reduce<
     {
@@ -139,7 +142,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
               {game.homeTeam?.name ?? 'Home'} vs {game.awayTeam?.name ?? 'Away'}
             </h1>
             <p className="text-xs text-ash">
-              {startedLabel} · {game.status}
+              {startedLabel} · {formatGameStatus(game.status)}
             </p>
           </div>
           <div className="w-full lg:w-auto">
@@ -235,7 +238,7 @@ export default async function GamePage({ params }: { params: { id: string } }) {
                     ) : (
                       '—'
                     )}{' '}
-                    · {event.resultType}
+                    · {formatShotResult(event.resultType)}
                   </span>
                 ))}
                 {turn.events.length === 0 && <span className="text-ash">No events yet.</span>}
@@ -245,6 +248,15 @@ export default async function GamePage({ params }: { params: { id: string } }) {
         </div>
       </section>
 
+      {isAdmin && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/50 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-rose-700">Admin: delete game</p>
+            <p className="text-xs text-rose-600">Removes this game and all of its events. This cannot be undone.</p>
+          </div>
+          <DeleteGameButton gameId={game.id} />
+        </section>
+      )}
     </div>
   );
 }

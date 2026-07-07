@@ -26,7 +26,11 @@ type LiveInsightsData = {
   }>;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to load game state');
+  return res.json();
+};
 
 export function LiveGameInsights({
   gameId,
@@ -116,7 +120,7 @@ export function LiveGameInsights({
             <div className="grid gap-3 md:grid-cols-3">
               {ratingLeaders.map((row, idx) => (
                 <div key={row.id} className="rounded-xl border border-garnet-100 bg-white/80 p-4">
-                  <p className="text-xs uppercase tracking-wide text-ash">#{idx + 1} adjusted FGM</p>
+                  <p className="text-xs uppercase tracking-wide text-ash">#{idx + 2} adjusted FGM</p>
                   <p className="mt-1 font-semibold text-ink">
                     <PlayerLink id={row.id} name={row.name} className="text-ink hover:text-garnet-600" />
                   </p>

@@ -23,7 +23,7 @@ export function ImportForm() {
       })
     });
     setLoading(false);
-    const body = await res.json();
+    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       setMessage(body?.error ?? 'Import failed');
     } else {

@@ -5,6 +5,7 @@ import { SeasonSelect } from '@/components/season-select';
 import { GameTypeSelect } from '@/components/game-type-select';
 import { GameType } from '@prisma/client';
 import { winnerFromGameState } from '@/lib/stats';
+import { formatGameType } from '@/lib/format';
 
 export const metadata = {
   title: 'Games | Century Cup'
@@ -36,7 +37,7 @@ export default async function GamesPage({
           <p className="text-xs uppercase tracking-wide text-garnet-600">Games</p>
           <h1 className="text-lg font-bold text-ink sm:text-2xl">Game history</h1>
           <p className="hidden text-[11px] text-ash sm:block sm:text-sm">
-            {season ? `Viewing ${season.name}` : 'Viewing all seasons'} · {typeFilter ?? 'All types'}
+            {season ? `Viewing ${season.name}` : 'Viewing all seasons'} · {typeFilter ? formatGameType(typeFilter) : 'All types'}
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-2">

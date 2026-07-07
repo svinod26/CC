@@ -262,6 +262,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 ]
               }
             },
+            orderBy: [{ timestamp: 'asc' }, { id: 'asc' }],
             select: { shooterId: true }
           });
           const shooterIds = Array.from(new Set(shooters.map((s) => s.shooterId).filter(Boolean)));

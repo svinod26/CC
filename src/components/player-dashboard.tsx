@@ -446,7 +446,7 @@ export async function PlayerDashboard({
                     </td>
                     <td className="p-0 text-center">
                       <Link href={href} className="block px-3 py-2">
-                        {row.attempts ? (row.fg * 100).toFixed(1) : '—'}%
+                        {row.attempts ? `${(row.fg * 100).toFixed(1)}%` : '—'}
                       </Link>
                     </td>
                     <td className="p-0 text-center">

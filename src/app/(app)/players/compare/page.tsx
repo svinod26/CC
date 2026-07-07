@@ -387,7 +387,7 @@ export default async function PlayerComparePage({
         {selected.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2">
             {selected.map((row) => {
-              const totalMakes = row.topRegular + row.topIsos + row.bottomRegular + row.bottomIsos;
+              const totalMakes = row.makes;
               const fg = row.attempts ? (totalMakes / row.attempts) * 100 : 0;
               return (
               <div key={row.id} className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
@@ -442,8 +442,8 @@ export default async function PlayerComparePage({
             <div className="space-y-3 rounded-xl border border-garnet-100 bg-parchment/60 p-4">
               <MetricBar
                 label="Total cups"
-                a={comparePair[0].topRegular + comparePair[0].topIsos + comparePair[0].bottomRegular + comparePair[0].bottomIsos}
-                b={comparePair[1].topRegular + comparePair[1].topIsos + comparePair[1].bottomRegular + comparePair[1].bottomIsos}
+                a={comparePair[0].makes}
+                b={comparePair[1].makes}
                 aLabel={comparePair[0].name}
                 bLabel={comparePair[1].name}
                 format={(value) => Math.round(value).toString()}
@@ -458,8 +458,8 @@ export default async function PlayerComparePage({
               />
               <MetricBar
                 label="FG%"
-                a={comparePair[0].attempts ? ((comparePair[0].topRegular + comparePair[0].topIsos + comparePair[0].bottomRegular + comparePair[0].bottomIsos) / comparePair[0].attempts) * 100 : 0}
-                b={comparePair[1].attempts ? ((comparePair[1].topRegular + comparePair[1].topIsos + comparePair[1].bottomRegular + comparePair[1].bottomIsos) / comparePair[1].attempts) * 100 : 0}
+                a={comparePair[0].attempts ? (comparePair[0].makes / comparePair[0].attempts) * 100 : 0}
+                b={comparePair[1].attempts ? (comparePair[1].makes / comparePair[1].attempts) * 100 : 0}
                 aLabel={comparePair[0].name}
                 bLabel={comparePair[1].name}
                 suffix="%"

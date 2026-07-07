@@ -68,8 +68,7 @@ export default async function TeamsPage({
     where: {
       resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
       ...(season ? { game: { seasonId: season.id } } : {})
-    },
-    include: { game: { include: { scheduleEntry: true } } }
+    }
   });
   const pullEvents = await prisma.shotEvent.findMany({
     where: {
@@ -81,8 +80,7 @@ export default async function TeamsPage({
     where: season ? { game: { seasonId: season.id } } : {}
   });
   const legacyStats = await prisma.legacyPlayerStat.findMany({
-    where: season ? { game: { seasonId: season.id } } : {},
-    include: { game: { include: { scheduleEntry: true } } }
+    where: season ? { game: { seasonId: season.id } } : {}
   });
 
   const teamStats = new Map<string, TeamAgg>();
@@ -165,11 +163,6 @@ export default async function TeamsPage({
       if (event.resultType === ResultType.BOTTOM_ISO) current.bottomIsos += 1;
 
       if (remaining <= 20) current.clutchMakes += 1;
-
-      const week = event.game?.scheduleEntry?.week;
-      if (week && week >= 1 && week <= weekCount) {
-        // weekly trend handled by net margin from game results
-      }
     }
 
     teamStats.set(event.offenseTeamId, current);
@@ -206,11 +199,6 @@ export default async function TeamsPage({
     current.topIsos += stat.topIso;
     current.bottoms += stat.bottomRegular + stat.bottomIso;
     current.bottomIsos += stat.bottomIso;
-
-    const week = stat.game?.scheduleEntry?.week;
-    if (week && week >= 1 && week <= weekCount) {
-      // weekly trend handled by net margin from game results
-    }
 
     teamStats.set(stat.teamId, current);
   }

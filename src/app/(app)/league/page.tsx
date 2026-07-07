@@ -58,8 +58,6 @@ export default async function LeaguePage({
     if (!home || !away) continue;
     home.games += 1;
     away.games += 1;
-    const homeRemaining = game.state.homeCupsRemaining;
-    const awayRemaining = game.state.awayCupsRemaining;
     const winner = winnerFromGameState(game.state, {
       statsSource: game.statsSource,
       homeTeamId: game.homeTeamId,

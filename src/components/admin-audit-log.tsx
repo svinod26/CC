@@ -13,7 +13,11 @@ type AuditLogRow = {
   gameLabel: string | null;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to load audit log');
+  return res.json();
+};
 
 export function AdminAuditLog() {
   const { data } = useSWR<{ logs: AuditLogRow[] }>('/api/admin/audit-log?limit=120', fetcher, {

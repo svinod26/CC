@@ -125,6 +125,12 @@ export function GameSetupForm({
         setError('Each lineup must have unique shooters.');
         return;
       }
+      const awayNameSet = new Set(cleanAwayNames.map((name) => name.toLowerCase()));
+      const crossSideName = cleanHomeNames.find((name) => awayNameSet.has(name.toLowerCase()));
+      if (crossSideName) {
+        setError(`${crossSideName} can’t shoot for both teams.`);
+        return;
+      }
     }
 
     if (isLeague && (lineupIds.some((id) => !id) || awayIds.some((id) => !id))) {
@@ -137,6 +143,11 @@ export function GameSetupForm({
       (new Set(lineupIds).size !== lineupIds.length || new Set(awayIds).size !== awayIds.length)
     ) {
       setError('Each lineup must have unique shooters.');
+      return;
+    }
+
+    if (isLeague && lineupIds.some((id) => awayIds.includes(id))) {
+      setError('A player can’t shoot for both teams.');
       return;
     }
 
@@ -155,19 +166,24 @@ export function GameSetupForm({
       awayLineupNames: !isLeague ? cleanAwayNames : undefined
     };
 
-    const res = await fetch('/api/games', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    setLoading(false);
-    if (!res.ok) {
-      const body = await res.json();
-      setError(body?.error ?? 'Failed to create game');
-      return;
+    try {
+      const res = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.error ?? 'Failed to create game');
+        return;
+      }
+      const data = await res.json();
+      router.push(`/games/${data.id}`);
+    } catch {
+      setError('Failed to create game. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    const data = await res.json();
-    router.push(`/games/${data.id}`);
   };
 
   const homePlayers = rosterOptions.home ?? [];
