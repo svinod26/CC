@@ -52,25 +52,60 @@ const toNumber = (value) => {
   return Number.isFinite(num) ? num : 0;
 };
 
+// Sheet labels that look like player names but are teams or template junk.
+const KNOWN_TEAM_WORDS = new Set([
+  'a', 'c', 'e', 'f', 'migos', 'candice', 'gargantuan', 'names', 'no names', 'teams'
+]);
+
 const isValidPlayerName = (value) => {
   const name = normalizeName(value);
   if (!name) return false;
-  if (/^\d+$/.test(name)) return false;
+  if (/^-?\d+$/.test(name)) return false;
+  if (name.includes('#')) return false; // #REF!, #DIV/0!
   const lowered = name.toLowerCase();
   if (['total', 'totals', 'pulled cups', 'pulled cup', 'bank'].includes(lowered)) return false;
   if (lowered.startsWith('team ')) return false;
+  if (KNOWN_TEAM_WORDS.has(lowered)) return false;
+  if (/\d+\s+people$/.test(lowered)) return false;
   return true;
 };
 
 const isValidTeamName = (value) => {
   const name = normalizeName(value);
   if (!name) return false;
+  if (name.includes('#')) return false; // broken formula refs
+  if (/^-?\d+(\.\d+)?$/.test(name)) return false;
   const lowered = name.toLowerCase();
   if (['result', 'margin', 'vs', 'win', 'loss'].includes(lowered)) return false;
   return true;
 };
 
 const getSheetNames = (workbook) => workbook.SheetNames.filter((name) => /^week\s*\d+/i.test(name));
+
+// Some short names mean different people in different semesters (verified
+// against each season's draft/final-roster grids). Keys are normalized names.
+const SEASON_NAME_OVERRIDES = {
+  F2022: { nikita: 'Nikita Tcherevik', miguel: 'Miguel Fernandez', sebastian: 'Sebastian Dounchis' },
+  S2023: { nikita: 'Nikita Tcherevik', zhou: 'Mike Zhou' },
+  S2024: { miguel: 'Miguel Fernandez', david: 'David Zhang' },
+  F2024: { nikita: 'Nikita Sakharuk', will: 'Will Blankenship' },
+  S2025: { nikita: 'Nikita Sakharuk', will: 'Will Blankenship', david: 'David Pinero-Jacome' }
+};
+
+// Wrap the shared resolver with season-specific identity overrides and
+// commissioner annotations ("Elmer trade" rows are just the player's stats).
+const withSeasonOverrides = (resolver, seasonName) => {
+  const overrides = SEASON_NAME_OVERRIDES[seasonName] ?? {};
+  return {
+    ...resolver,
+    resolvePlayer: async (name, email) => {
+      let cleaned = normalizeName(name).replace(/\s+trade$/i, '');
+      const override = overrides[normalizeKey(cleaned)];
+      if (override) cleaned = override;
+      return resolver.resolvePlayer(cleaned, email);
+    }
+  };
+};
 
 const parseSeasonFromFilename = (file) => {
   const match = file.match(/([FS])(\d{4})/i);
@@ -241,6 +276,8 @@ const parseWeekSheet = (wb, sheetName) => {
     const playersRight = [];
     let pulledLeft = 0;
     let pulledRight = 0;
+    let totalLeft = 0;
+    let totalRight = 0;
 
     for (let i = headerInfo.rowIndex + 1; i < rows.length; i += 1) {
       const dataRow = rows[i];
@@ -256,6 +293,8 @@ const parseWeekSheet = (wb, sheetName) => {
       }
 
       if (markerLeft === 'total' || markerRight === 'total' || markerLeft === 'totals' || markerRight === 'totals') {
+        totalLeft = toNumber(dataRow[leftCols.totalCups]);
+        totalRight = toNumber(dataRow[rightCols.totalCups]);
         break;
       }
 
@@ -301,6 +340,7 @@ const parseWeekSheet = (wb, sheetName) => {
       leftMeta,
       rightMeta,
       pulled: { left: pulledLeft, right: pulledRight },
+      teamTotals: { left: totalLeft, right: totalRight },
       playersLeft,
       playersRight,
       played: hasStats(playersLeft) || hasStats(playersRight) || pulledLeft > 0 || pulledRight > 0
@@ -577,7 +617,18 @@ async function importSchedule({ wb, seasonId, teamMap, conferenceId }) {
   });
 
   for (const { week, homeCol, awayCol } of weekColumns) {
+    let sawData = false;
     for (let r = 2; r < rows.length; r += 1) {
+      const rawHome = normalizeName(rows[r][homeCol]);
+      const rawAway = normalizeName(rows[r][awayCol]);
+      // The schedule grid ends at the first blank row; below it live
+      // per-captain matchup grids that are not team pairings.
+      if (!rawHome && !rawAway) {
+        if (sawData) break;
+        continue;
+      }
+      sawData = true;
+      if (!isValidTeamName(rawHome) || !isValidTeamName(rawAway)) continue;
       const homeName = normalizeTeamName(rows[r][homeCol]);
       const awayName = normalizeTeamName(rows[r][awayCol]);
       if (!homeName || !awayName) continue;
@@ -595,10 +646,21 @@ async function importSchedule({ wb, seasonId, teamMap, conferenceId }) {
   }
 }
 
-async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, conferenceId, resolver, issues }) {
+async function createGameFromMatchup({
+  seasonId,
+  matchup,
+  scheduleRow,
+  teamMap,
+  conferenceId,
+  resolver,
+  issues,
+  gameType = GameType.LEAGUE,
+  teamsOverride = null,
+  skipRoster = false
+}) {
   const { leftTeam, rightTeam, playersLeft, playersRight, pulled, week, leftMeta, rightMeta } = matchup;
-  const left = await getOrCreateTeam(teamMap, seasonId, leftTeam, conferenceId);
-  const right = await getOrCreateTeam(teamMap, seasonId, rightTeam, conferenceId);
+  const left = teamsOverride?.left ?? (await getOrCreateTeam(teamMap, seasonId, leftTeam, conferenceId));
+  const right = teamsOverride?.right ?? (await getOrCreateTeam(teamMap, seasonId, rightTeam, conferenceId));
   if (!left || !right) return null;
 
   const contextLeft = `Week ${week} ${leftTeam}`;
@@ -607,10 +669,27 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
   const normalizedLeft = playersLeft.map((p) => normalizePlayerStats(p, contextLeft, issues));
   const normalizedRight = playersRight.map((p) => normalizePlayerStats(p, contextRight, issues));
 
-  const leftTotal = normalizedLeft.reduce((sum, p) => sum + toNumber(p.totalCups), 0);
-  const rightTotal = normalizedRight.reduce((sum, p) => sum + toNumber(p.totalCups), 0);
+  let leftTotal = normalizedLeft.reduce((sum, p) => sum + toNumber(p.totalCups), 0);
+  let rightTotal = normalizedRight.reduce((sum, p) => sum + toNumber(p.totalCups), 0);
 
-  if (leftTotal + rightTotal + pulled.left + pulled.right === 0) return null;
+  // Some games recorded only team totals, written into the Pulled Cups row
+  // (e.g. F2024 W1 E vs Gargantuan). When a side has no player stats and its
+  // "pulled" value equals the sheet's Total row, treat it as the team total.
+  const teamTotals = matchup.teamTotals ?? { left: 0, right: 0 };
+  let pulledLeft = pulled.left;
+  let pulledRight = pulled.right;
+  if (leftTotal === 0 && pulledLeft > 0 && teamTotals.left > 0 && pulledLeft === teamTotals.left) {
+    leftTotal = teamTotals.left;
+    pulledLeft = 0;
+    issues.push(`Week ${week} ${leftTeam}: team-total-only game (no player stats)`);
+  }
+  if (rightTotal === 0 && pulledRight > 0 && teamTotals.right > 0 && pulledRight === teamTotals.right) {
+    rightTotal = teamTotals.right;
+    pulledRight = 0;
+    issues.push(`Week ${week} ${rightTeam}: team-total-only game (no player stats)`);
+  }
+
+  if (leftTotal + rightTotal + pulledLeft + pulledRight === 0) return null;
 
   const homeTeamId = scheduleRow?.homeTeamId ?? left.id;
   const awayTeamId = scheduleRow?.awayTeamId ?? right.id;
@@ -619,7 +698,7 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
   const game = await prisma.game.create({
     data: {
       seasonId,
-      type: GameType.LEAGUE,
+      type: gameType,
       status: GameStatus.FINAL,
       homeTeamId,
       awayTeamId,
@@ -649,14 +728,14 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
   for (const [idx, player] of leftSorted.entries()) {
     const dbPlayer = await resolver.resolvePlayer(player.name);
     if (dbPlayer) {
-      await ensureRoster(seasonId, left.id, dbPlayer.id);
+      if (!skipRoster) await ensureRoster(seasonId, left.id, dbPlayer.id);
       lineupData.push({ gameId: game.id, teamId: left.id, playerId: dbPlayer.id, orderIndex: idx });
     }
   }
   for (const [idx, player] of rightSorted.entries()) {
     const dbPlayer = await resolver.resolvePlayer(player.name);
     if (dbPlayer) {
-      await ensureRoster(seasonId, right.id, dbPlayer.id);
+      if (!skipRoster) await ensureRoster(seasonId, right.id, dbPlayer.id);
       lineupData.push({ gameId: game.id, teamId: right.id, playerId: dbPlayer.id, orderIndex: idx });
     }
   }
@@ -705,11 +784,11 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
   }
 
   const legacyTeamStats = [];
-  if (pulled.left > 0) {
-    legacyTeamStats.push({ gameId: game.id, teamId: left.id, pulledCups: pulled.left });
+  if (pulledLeft > 0) {
+    legacyTeamStats.push({ gameId: game.id, teamId: left.id, pulledCups: pulledLeft });
   }
-  if (pulled.right > 0) {
-    legacyTeamStats.push({ gameId: game.id, teamId: right.id, pulledCups: pulled.right });
+  if (pulledRight > 0) {
+    legacyTeamStats.push({ gameId: game.id, teamId: right.id, pulledCups: pulledRight });
   }
   if (legacyTeamStats.length) {
     await prisma.legacyTeamStat.createMany({ data: legacyTeamStats, skipDuplicates: true });
@@ -717,7 +796,7 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
 
   const leftResult = (leftMeta?.result ?? '').toLowerCase();
   const rightResult = (rightMeta?.result ?? '').toLowerCase();
-  let marginValue = leftMeta?.margin || rightMeta?.margin || 0;
+  let marginValue = Math.round(leftMeta?.margin || rightMeta?.margin || 0);
   let winner = '';
   if (leftResult === 'win') winner = 'left';
   if (rightResult === 'win') winner = 'right';
@@ -730,9 +809,19 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
     if (derived > 0) marginValue = derived;
   }
 
-  let remainingLeft = Math.max(100 - (rightTotal + pulled.left), 0);
-  let remainingRight = Math.max(100 - (leftTotal + pulled.right), 0);
-  if (marginValue > 0 && winner) {
+  let remainingLeft = Math.max(100 - (rightTotal + pulledLeft), 0);
+  let remainingRight = Math.max(100 - (leftTotal + pulledRight), 0);
+  let phase = 'REGULATION';
+  let possessionTeamId = homeTeamId;
+  if (winner && marginValue === 0) {
+    // Margin-0 win (tiebreak/OT). Store as an overtime final so the app
+    // derives the winner from possessionTeamId at 0-0.
+    remainingLeft = 0;
+    remainingRight = 0;
+    phase = 'OVERTIME';
+    possessionTeamId = winner === 'left' ? left.id : right.id;
+    issues.push(`Week ${week} ${leftTeam} vs ${rightTeam}: margin-0 result stored as OT win for ${winner === 'left' ? leftTeam : rightTeam}`);
+  } else if (marginValue > 0 && winner) {
     if (winner === 'left') {
       remainingLeft = 0;
       remainingRight = marginValue;
@@ -748,12 +837,13 @@ async function createGameFromMatchup({ seasonId, matchup, scheduleRow, teamMap, 
   await prisma.gameState.create({
     data: {
       gameId: game.id,
-      possessionTeamId: homeTeamId,
+      possessionTeamId,
       homeCupsRemaining: homeRemaining,
       awayCupsRemaining: awayRemaining,
       currentTurnNumber: 1,
       currentShooterIndex: 0,
-      status: GameStatus.FINAL
+      status: GameStatus.FINAL,
+      phase
     }
   });
 
@@ -836,6 +926,61 @@ async function importWeekSheets({ wb, seasonId, teamMap, conferenceId, resolver 
   return issues;
 }
 
+async function importSecondaryGames({ wb, seasonId, resolver }) {
+  const sheetName = wb.SheetNames.find((name) => /^secondary games$/i.test(name));
+  if (!sheetName) return [];
+  const issues = [];
+  const parsed = parseWeekSheet(wb, sheetName);
+  const matchups = parsed.matchups.filter((m) => m.played);
+  if (!matchups.length) return issues;
+
+  // Ad-hoc season-less teams, matching how the app creates exhibition games.
+  const getOrCreateExhibitionTeam = async (name) => {
+    const normalized = normalizeTeamName(name);
+    if (!normalized) return null;
+    let team = await prisma.team.findFirst({ where: { seasonId: null, name: normalized } });
+    if (!team) team = await prisma.team.create({ data: { name: normalized } });
+    return team;
+  };
+
+  const teamIds = new Set();
+  for (const matchup of matchups) {
+    const left = await getOrCreateExhibitionTeam(matchup.leftTeam);
+    const right = await getOrCreateExhibitionTeam(matchup.rightTeam);
+    if (left) teamIds.add(left.id);
+    if (right) teamIds.add(right.id);
+  }
+  // Idempotency: replace previously imported secondary games for this season.
+  await prisma.game.deleteMany({
+    where: {
+      seasonId,
+      type: GameType.EXHIBITION,
+      statsSource: StatsSource.LEGACY,
+      homeTeamId: { in: [...teamIds] }
+    }
+  });
+
+  for (const matchup of matchups) {
+    const left = await getOrCreateExhibitionTeam(matchup.leftTeam);
+    const right = await getOrCreateExhibitionTeam(matchup.rightTeam);
+    if (!left || !right) continue;
+    await createGameFromMatchup({
+      seasonId,
+      matchup,
+      scheduleRow: null,
+      teamMap: new Map(),
+      conferenceId: null,
+      resolver,
+      issues,
+      gameType: GameType.EXHIBITION,
+      teamsOverride: { left, right },
+      skipRoster: true
+    });
+  }
+  console.log(`Imported ${matchups.length} secondary (exhibition) games.`);
+  return issues;
+}
+
 async function importSeason(file, resolver) {
   const seasonInfo = parseSeasonFromFilename(file);
   if (!seasonInfo) {
@@ -847,10 +992,13 @@ async function importSeason(file, resolver) {
   const season = await getOrCreateSeason(seasonInfo.name, seasonInfo.year);
   const conference = await getOrCreateConference(season.id, 'League');
   const teamMap = new Map();
+  const seasonResolver = withSeasonOverrides(resolver, seasonInfo.name);
 
-  await importDraft({ wb, seasonId: season.id, teamMap, conferenceId: conference.id, resolver });
+  await importDraft({ wb, seasonId: season.id, teamMap, conferenceId: conference.id, resolver: seasonResolver });
   await importSchedule({ wb, seasonId: season.id, teamMap, conferenceId: conference.id });
-  const issues = await importWeekSheets({ wb, seasonId: season.id, teamMap, conferenceId: conference.id, resolver });
+  const issues = await importWeekSheets({ wb, seasonId: season.id, teamMap, conferenceId: conference.id, resolver: seasonResolver });
+  const secondaryIssues = await importSecondaryGames({ wb, seasonId: season.id, resolver: seasonResolver });
+  issues.push(...secondaryIssues);
 
   if (issues.length) {
     console.log(`Issues for ${season.name}:`);
@@ -895,7 +1043,12 @@ async function main() {
   const targetFiles =
     fileArgIndex >= 0 && args[fileArgIndex + 1]
       ? [args[fileArgIndex + 1]]
-      : fs.readdirSync(process.cwd()).filter((file) => SEASON_FILE_REGEX.test(file));
+      : fs
+          .readdirSync(process.cwd())
+          .filter((file) => SEASON_FILE_REGEX.test(file))
+          // F2025 was imported from the hand-verified f2025.json; never
+          // overwrite it from the raw sheet in a bulk run.
+          .filter((file) => !/F2025/i.test(file));
 
   await runImport({ files: targetFiles });
 }
