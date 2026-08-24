@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { loadEmailMapping } from '@/lib/email-mapping';
+import { canonicalizeEmail, normalizeEmail } from '@/lib/email';
 import { sendResendEmail } from '@/lib/resend';
 
 const requestSchema = z.object({
@@ -11,19 +12,6 @@ const requestSchema = z.object({
 });
 
 const generatePassword = () => randomBytes(9).toString('base64url');
-const canonicalizeEmail = (value: string) => {
-  const normalized = value.trim().toLowerCase();
-  const atIndex = normalized.indexOf('@');
-  if (atIndex < 1) return normalized;
-  const local = normalized.slice(0, atIndex);
-  const domain = normalized.slice(atIndex + 1);
-  if (domain === 'gmail.com' || domain === 'googlemail.com') {
-    const withoutTag = local.split('+')[0] ?? local;
-    const withoutDots = withoutTag.replace(/\./g, '');
-    return `${withoutDots}@gmail.com`;
-  }
-  return normalized;
-};
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => null);
@@ -35,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
   }
 
-  const email = parsed.data.email.trim().toLowerCase();
+  const email = normalizeEmail(parsed.data.email);
   const canonicalEmail = canonicalizeEmail(email);
   let resolvedName: string | null = null;
   let mappedEmail: string | null = null;
@@ -43,7 +31,7 @@ export async function POST(req: Request) {
     const mapping = loadEmailMapping();
     const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
     resolvedName = entry?.name ?? null;
-    mappedEmail = entry?.email?.toLowerCase?.() ?? null;
+    mappedEmail = entry?.email ? normalizeEmail(entry.email) : null;
   } catch (error) {
     console.error('Email mapping load failed; falling back to database lookup', error);
   }

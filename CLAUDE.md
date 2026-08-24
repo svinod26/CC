@@ -41,3 +41,13 @@ Layout: `src/app/(auth)` sign-in/sign-up, `src/app/(app)` authenticated pages, `
 - **Seasons** are named `F<year>`/`S<year>` (e.g. `S2026`). `src/lib/season.ts` owns sorting and resolving the selected season from the `?season=` URL param (defaults to the current term, `all` supported).
 - **Player identity across seasons**: players are matched by email and by `PlayerAlias` (nickname) rows, built from `Name_email_mapping.xlsx`. Historical import: `node scripts/import-historical.mjs` (optionally `--file "SOMIL S2026.xlsx"`); current-season import goes through the admin UI at `/admin/import`.
 - **Weekly recap** (`src/lib/ai.ts`) uses `GEMINI_API_KEY` and falls back to a templated recap when unset.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

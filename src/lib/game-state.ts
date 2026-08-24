@@ -19,7 +19,7 @@ export async function recomputeGameState(gameId: string, options: RecomputeOptio
         lineups: true,
         turns: {
           orderBy: { turnIndex: 'asc' },
-          include: { events: { orderBy: { timestamp: 'asc' } } }
+          include: { events: { orderBy: [{ timestamp: 'asc' }, { id: 'asc' }] } }
         }
       }
     });

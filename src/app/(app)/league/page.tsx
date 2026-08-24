@@ -10,10 +10,11 @@ export const metadata = {
 export default async function LeaguePage({
   searchParams
 }: {
-  searchParams?: { season?: string };
+  searchParams?: Promise<{ season?: string }>;
 }) {
+  const query = (await searchParams) ?? {};
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
-  const seasonParam = searchParams?.season === 'all' ? undefined : searchParams?.season;
+  const seasonParam = query.season === 'all' ? undefined : query.season;
   const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, seasonParam);
 
   const seasonWithData = season

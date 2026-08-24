@@ -7,8 +7,9 @@ import { GameType } from '@prisma/client';
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams?: { season?: string; type?: string };
+  searchParams?: Promise<{ season?: string; type?: string }>;
 }) {
+  const query = (await searchParams) ?? {};
   const session = await getServerAuthSession();
   const email = session?.user?.email;
 
@@ -35,8 +36,8 @@ export default async function DashboardPage({
   }
 
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
-  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, searchParams?.season);
-  const typeValue = searchParams?.type ?? 'LEAGUE';
+  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, query.season);
+  const typeValue = query.type ?? 'LEAGUE';
   const typeFilter = typeValue === 'all' ? null : (typeValue as GameType);
 
   return (

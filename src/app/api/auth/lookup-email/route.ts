@@ -1,24 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { loadEmailMapping } from '@/lib/email-mapping';
+import { canonicalizeEmail, emailCandidates, normalizeEmail } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
 
 const schema = z.object({
   email: z.string().email()
 });
-const canonicalizeEmail = (value: string) => {
-  const normalized = value.trim().toLowerCase();
-  const atIndex = normalized.indexOf('@');
-  if (atIndex < 1) return normalized;
-  const local = normalized.slice(0, atIndex);
-  const domain = normalized.slice(atIndex + 1);
-  if (domain === 'gmail.com' || domain === 'googlemail.com') {
-    const withoutTag = local.split('+')[0] ?? local;
-    const withoutDots = withoutTag.replace(/\./g, '');
-    return `${withoutDots}@gmail.com`;
-  }
-  return normalized;
-};
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => null);
@@ -30,9 +18,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ found: false }, { status: 400 });
   }
 
-  const email = parsed.data.email.trim().toLowerCase();
+  const email = normalizeEmail(parsed.data.email);
   const canonicalEmail = canonicalizeEmail(email);
-  const candidateEmails = canonicalEmail === email ? [email] : [email, canonicalEmail];
+  const candidateEmails = emailCandidates(email);
   try {
     const mapping = loadEmailMapping();
     const entry = mapping.get(email) ?? mapping.get(canonicalEmail);

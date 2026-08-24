@@ -38,10 +38,11 @@ const maxFrom = (rows: TeamAgg[], valueFor: (row: TeamAgg) => number) => {
 export default async function TeamsPage({
   searchParams
 }: {
-  searchParams?: { season?: string };
+  searchParams?: Promise<{ season?: string }>;
 }) {
+  const query = (await searchParams) ?? {};
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
-  const seasonParam = searchParams?.season === 'all' ? undefined : searchParams?.season;
+  const seasonParam = query.season === 'all' ? undefined : query.season;
   const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, seasonParam);
   const maxWeekRow = await prisma.schedule.aggregate({
     where: season ? { seasonId: season.id } : {},

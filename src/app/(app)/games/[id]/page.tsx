@@ -19,10 +19,11 @@ export const viewport: Viewport = {
   userScalable: false
 };
 
-export default async function GamePage({ params }: { params: { id: string } }) {
+export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await getServerAuthSession();
   const game = await prisma.game.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       homeTeam: true,
       awayTeam: true,
@@ -32,9 +33,12 @@ export default async function GamePage({ params }: { params: { id: string } }) {
       lineups: { include: { player: true } },
       turns: {
         orderBy: { turnIndex: 'asc' },
-        include: { events: { orderBy: { timestamp: 'asc' }, include: { shooter: true } }, offenseTeam: true }
+        include: {
+          events: { orderBy: [{ timestamp: 'asc' }, { id: 'asc' }], include: { shooter: true } },
+          offenseTeam: true
+        }
       },
-      events: { include: { shooter: true }, orderBy: { timestamp: 'asc' } },
+      events: { include: { shooter: true }, orderBy: [{ timestamp: 'asc' }, { id: 'asc' }] },
       legacyStats: { include: { player: true } },
       legacyTeamStats: true
     }

@@ -3,13 +3,14 @@ import { getAdminGameSnapshot } from '@/lib/admin-editor';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const snapshot = await getAdminGameSnapshot(params.id);
+  const { id } = await params;
+  const snapshot = await getAdminGameSnapshot(id);
   if (!snapshot) {
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
   }

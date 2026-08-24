@@ -6,25 +6,27 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 const eventSchema = z.object({
-  shooterId: z.string().optional(),
+  shooterId: z.string().min(1).optional(),
   resultType: z.nativeEnum(ResultType),
-  teamId: z.string(),
-  count: z.number().optional()
-});
+  teamId: z.string().min(1),
+  count: z.number().int().min(-25).max(25).refine((value) => value !== 0).optional()
+}).strict();
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+class ConcurrentGameUpdateError extends Error {}
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const json = await req.json();
+  const json = await req.json().catch(() => null);
   const parsed = eventSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
-  const { id: gameId } = params;
+  const { id: gameId } = await params;
   const data = parsed.data;
   const resultType = data.resultType;
   const isPull = resultType === ResultType.PULL_HOME || resultType === ResultType.PULL_AWAY;
@@ -51,7 +53,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   });
 
-  if (!game || !game.state) {
+  if (!game || !game.state || !game.homeTeamId || !game.awayTeamId) {
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
   }
   const isScorer =
@@ -78,7 +80,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const phase = game.state.phase ?? 'REGULATION';
   const offenseTeamId = game.state.possessionTeamId ?? game.homeTeamId ?? data.teamId;
   const defenseTeamId =
-    offenseTeamId === game.homeTeamId ? game.awayTeamId ?? null : game.homeTeamId ?? null;
+    offenseTeamId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
+
+  if (!isPull && data.teamId !== offenseTeamId) {
+    return NextResponse.json(
+      { error: 'Possession changed. Refresh before recording this shot.' },
+      { status: 409 }
+    );
+  }
 
   const offenseLineup = game.lineups
     .filter((l) => l.teamId === offenseTeamId && l.isActive)
@@ -125,8 +134,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           ? game.state.awayCupsRemaining
           : game.state.homeCupsRemaining;
 
-  const rawCount = typeof data.count === 'number' ? Math.trunc(data.count) : 1;
-  const pullDelta = rawCount === 0 ? 1 : rawCount;
+  const pullDelta = data.count ?? 1;
   const cupsDelta = isPull ? pullDelta : isMake ? 1 : 0;
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
   const cupsAfter = clamp(cupsTargetBefore - cupsDelta, 0, 100);
@@ -137,14 +145,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         ? game.awayTeamId
         : null;
 
-  const event = await prisma.$transaction(async (tx) => {
+  let event;
+  try {
+    event = await prisma.$transaction(async (tx) => {
     const createdEvent = await tx.shotEvent.create({
       data: {
         gameId,
         turnId: ensuredTurn.id,
         offenseTeamId,
         defenseTeamId: pullTargetTeamId ?? defenseTeamId,
-        shooterId: data.shooterId,
+        shooterId: isPull ? null : data.shooterId,
         resultType,
         cupsDelta,
         remainingCupsBefore: cupsTargetBefore,
@@ -304,16 +314,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
-    await tx.game.update({
-      where: { id: gameId },
+    const gameUpdate = await tx.game.updateMany({
+      where: { id: gameId, status: GameStatus.IN_PROGRESS },
       data: {
         status: newStatus,
         endedAt: newStatus === GameStatus.FINAL ? new Date() : undefined
       }
     });
+    if (gameUpdate.count !== 1) {
+      throw new ConcurrentGameUpdateError();
+    }
 
-    await tx.gameState.update({
-      where: { gameId },
+    const stateUpdate = await tx.gameState.updateMany({
+      where: {
+        gameId,
+        status: GameStatus.IN_PROGRESS,
+        updatedAt: game.state!.updatedAt
+      },
       data: {
         homeCupsRemaining: nextHome,
         awayCupsRemaining: nextAway,
@@ -324,9 +341,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         phase: nextPhase
       }
     });
+    if (stateUpdate.count !== 1) {
+      throw new ConcurrentGameUpdateError();
+    }
 
     return createdEvent;
-  });
+    });
+  } catch (error) {
+    if (error instanceof ConcurrentGameUpdateError) {
+      return NextResponse.json(
+        { error: 'Another score update landed first. Refresh and try again.' },
+        { status: 409 }
+      );
+    }
+    throw error;
+  }
 
   return NextResponse.json({ eventId: event.id });
 }

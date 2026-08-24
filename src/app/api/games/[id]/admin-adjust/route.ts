@@ -32,7 +32,7 @@ const isMake = (resultType: ResultType) =>
   resultType === ResultType.BOTTOM_REGULAR ||
   resultType === ResultType.BOTTOM_ISO;
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -45,8 +45,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
+  const { id } = await params;
   const game = await prisma.game.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       state: true,
       turns: { orderBy: { turnIndex: 'desc' }, take: 1 },

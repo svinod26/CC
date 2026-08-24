@@ -11,7 +11,7 @@ const finalizeSchema = z
   })
   .optional();
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,8 +23,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
   const winnerTeamId = parsed.data?.winnerTeamId;
 
+  const { id } = await params;
   const game = await prisma.game.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { statTaker: true, state: true }
   });
   if (!game) {
@@ -55,14 +56,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   await prisma.$transaction([
     prisma.game.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: GameStatus.FINAL,
         endedAt: new Date()
       }
     }),
     prisma.gameState.updateMany({
-      where: { gameId: params.id },
+      where: { gameId: id },
       data: {
         status: GameStatus.FINAL,
         ...(isOvertimeTied && winnerTeamId ? { possessionTeamId: winnerTeamId } : {})

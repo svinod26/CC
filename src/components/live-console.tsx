@@ -83,7 +83,15 @@ export function LiveConsole({
     data?.state?.status === 'IN_PROGRESS' &&
     data?.state?.homeCupsRemaining === 0 &&
     data?.state?.awayCupsRemaining === 0;
-  const [overtimeWinnerId, setOvertimeWinnerId] = useState<string | null>(null);
+  const overtimeStateVersion = String(data?.state?.updatedAt ?? '');
+  const [overtimeSelection, setOvertimeSelection] = useState<{
+    teamId: string;
+    stateVersion: string;
+  } | null>(null);
+  const overtimeWinnerId =
+    overtimeNeedsWinner && overtimeSelection?.stateVersion === overtimeStateVersion
+      ? overtimeSelection.teamId
+      : null;
 
   const offenseLineup = useMemo(
     () =>
@@ -130,12 +138,6 @@ export function LiveConsole({
       router.replace('/');
     }
   }, [data, router]);
-
-  useEffect(() => {
-    if (!overtimeNeedsWinner) {
-      setOvertimeWinnerId(null);
-    }
-  }, [overtimeNeedsWinner]);
 
   const postEvent = async (body: Record<string, any>) => {
     try {
@@ -304,7 +306,10 @@ export function LiveConsole({
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => setOvertimeWinnerId(data?.homeTeam?.id ?? null)}
+                  onClick={() => {
+                    const teamId = data?.homeTeam?.id;
+                    setOvertimeSelection(teamId ? { teamId, stateVersion: overtimeStateVersion } : null);
+                  }}
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold ${touchClass} ${
                     overtimeWinnerId === data?.homeTeam?.id
                       ? 'border-garnet-300 bg-garnet-600 text-white'
@@ -315,7 +320,10 @@ export function LiveConsole({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setOvertimeWinnerId(data?.awayTeam?.id ?? null)}
+                  onClick={() => {
+                    const teamId = data?.awayTeam?.id;
+                    setOvertimeSelection(teamId ? { teamId, stateVersion: overtimeStateVersion } : null);
+                  }}
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold ${touchClass} ${
                     overtimeWinnerId === data?.awayTeam?.id
                       ? 'border-garnet-300 bg-garnet-600 text-white'
@@ -336,7 +344,7 @@ export function LiveConsole({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setOvertimeWinnerId(null)}
+                  onClick={() => setOvertimeSelection(null)}
                   className={`rounded-xl border border-garnet-200 bg-white px-3 py-2 text-sm font-semibold text-garnet-700 ${touchClass}`}
                 >
                   Clear

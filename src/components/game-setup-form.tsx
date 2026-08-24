@@ -1,7 +1,7 @@
 'use client';
 
 import { GameType, Team, TeamRoster, Player } from '@prisma/client';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 
@@ -21,7 +21,6 @@ export function GameSetupForm({
 }) {
   const router = useRouter();
   const [gameType, setGameType] = useState<GameType>('LEAGUE');
-  const [selectedSeasonId] = useState<string | undefined>(seasonId);
   const [homeTeamId, setHomeTeamId] = useState<string>('');
   const [awayTeamId, setAwayTeamId] = useState<string>('');
   const [homeTeamName, setHomeTeamName] = useState('');
@@ -52,29 +51,23 @@ export function GameSetupForm({
   const inputClass = 'w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm';
   const selectClass = `${inputClass} appearance-none pr-10`;
 
-  useEffect(() => {
+  const resetLineups = () => {
     setHomeLineup(Array.from({ length: 6 }, () => ''));
     setAwayLineup(Array.from({ length: 6 }, () => ''));
     setHomeLineupNames(Array.from({ length: 6 }, () => ''));
     setAwayLineupNames(Array.from({ length: 6 }, () => ''));
-    if (gameType === 'EXHIBITION') {
+  };
+
+  const changeGameType = (nextType: GameType) => {
+    setGameType(nextType);
+    resetLineups();
+    if (nextType === 'EXHIBITION') {
       setHomeTeamId('');
       setAwayTeamId('');
       setHomeTeamName('');
       setAwayTeamName('');
     }
-  }, [gameType]);
-
-  useEffect(() => {
-    if (gameType === 'LEAGUE') {
-      setHomeLineup(Array.from({ length: 6 }, () => ''));
-      setAwayLineup(Array.from({ length: 6 }, () => ''));
-    }
-  }, [homeTeamId, awayTeamId, gameType]);
-
-  useEffect(() => {
-    setWeek(maxWeek);
-  }, [maxWeek]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,7 +147,7 @@ export function GameSetupForm({
     setLoading(true);
     const payload = {
       type: gameType,
-      seasonId: selectedSeasonId || undefined,
+      seasonId: seasonId || undefined,
       homeTeamId: isLeague ? homeTeamId : undefined,
       awayTeamId: isLeague ? awayTeamId : undefined,
       homeTeamName: !isLeague ? homeTeamName : undefined,
@@ -199,7 +192,7 @@ export function GameSetupForm({
             <select
               className={selectClass}
               value={gameType}
-              onChange={(e) => setGameType(e.target.value as GameType)}
+              onChange={(e) => changeGameType(e.target.value as GameType)}
             >
               <option value="LEAGUE">League</option>
               <option value="EXHIBITION">Exhibition</option>
@@ -214,7 +207,14 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Home team</span>
             <div className="relative">
-              <select className={selectClass} value={homeTeamId} onChange={(e) => setHomeTeamId(e.target.value)}>
+              <select
+                className={selectClass}
+                value={homeTeamId}
+                onChange={(e) => {
+                  setHomeTeamId(e.target.value);
+                  setHomeLineup(Array.from({ length: 6 }, () => ''));
+                }}
+              >
                 <option value="">Select team</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -228,7 +228,14 @@ export function GameSetupForm({
           <label className="space-y-1 text-sm">
             <span className="text-ink">Away team</span>
             <div className="relative">
-              <select className={selectClass} value={awayTeamId} onChange={(e) => setAwayTeamId(e.target.value)}>
+              <select
+                className={selectClass}
+                value={awayTeamId}
+                onChange={(e) => {
+                  setAwayTeamId(e.target.value);
+                  setAwayLineup(Array.from({ length: 6 }, () => ''));
+                }}
+              >
                 <option value="">Select team</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>

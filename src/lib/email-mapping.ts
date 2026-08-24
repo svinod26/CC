@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
+import { canonicalizeEmail, normalizeEmail } from '@/lib/email';
 
 type MappingEntry = {
   name: string;
@@ -13,20 +14,6 @@ const normalize = (value: unknown) =>
     .replace(/\u00a0/g, ' ')
     .trim();
 
-const normalizeEmail = (value: string) => value.trim().toLowerCase();
-const canonicalizeEmail = (value: string) => {
-  const normalized = normalizeEmail(value);
-  const atIndex = normalized.indexOf('@');
-  if (atIndex < 1) return normalized;
-  const local = normalized.slice(0, atIndex);
-  const domain = normalized.slice(atIndex + 1);
-  if (domain === 'gmail.com' || domain === 'googlemail.com') {
-    const withoutTag = local.split('+')[0] ?? local;
-    const withoutDots = withoutTag.replace(/\./g, '');
-    return `${withoutDots}@gmail.com`;
-  }
-  return normalized;
-};
 const require = createRequire(import.meta.url);
 const XLSX = require('xlsx');
 if (typeof XLSX.set_fs === 'function') {
@@ -35,8 +22,8 @@ if (typeof XLSX.set_fs === 'function') {
 
 let cached: { map: Map<string, MappingEntry>; mtimeMs: number } | null = null;
 
-export function loadEmailMapping(filePath = 'Name_email_mapping.xlsx') {
-  const resolved = path.resolve(process.cwd(), filePath);
+export function loadEmailMapping() {
+  const resolved = path.join(process.cwd(), 'Name_email_mapping.xlsx');
   if (!fs.existsSync(resolved)) {
     return new Map<string, MappingEntry>();
   }

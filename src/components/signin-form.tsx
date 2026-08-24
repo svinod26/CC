@@ -1,24 +1,19 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 
 export function SignInForm() {
   const search = useSearchParams();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const created = search.get('created');
   const passwordSent = search.get('passwordSent');
   const emailFromQuery = search.get('email');
-
-  useEffect(() => {
-    if (emailFromQuery && !email) {
-      setEmail(emailFromQuery);
-    }
-  }, [emailFromQuery, email]);
+  const [email, setEmail] = useState(emailFromQuery ?? '');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +24,8 @@ export function SignInForm() {
       if (res?.error) {
         setError('Invalid email or password');
       } else {
-        window.location.href = '/';
+        router.push('/');
+        router.refresh();
       }
     } catch {
       setError('Sign-in failed. Please try again.');

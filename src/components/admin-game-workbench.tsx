@@ -3,7 +3,7 @@
 import { ResultType } from '@prisma/client';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type GameOption = {
   id: string;
@@ -84,27 +84,28 @@ export function AdminGameWorkbench({
   );
 
   const snapshot = data ?? null;
+  const selectedPlayerId =
+    playerId && snapshot?.players.some((player) => player.id === playerId)
+      ? playerId
+      : snapshot?.players[0]?.id ?? '';
+  const selectedPlayer = snapshot?.players.find((player) => player.id === selectedPlayerId) ?? null;
 
-  useEffect(() => {
-    const first = snapshot?.players?.[0]?.id ?? '';
-    setPlayerId((current) => {
-      if (!snapshot?.players?.length) return '';
-      if (current && snapshot.players.some((player) => player.id === current)) return current;
-      return first;
-    });
-  }, [snapshot]);
-
-  const selectedPlayer = snapshot?.players.find((player) => player.id === playerId) ?? null;
+  const selectGame = (id: string) => {
+    setSelectedGameId(id);
+    setPlayerId('');
+    setMessage(null);
+    setError(null);
+  };
 
   const submitPlayer = async (action: 'ADD' | 'SUBTRACT') => {
-    if (!selectedGameId || !playerId) return;
+    if (!selectedGameId || !selectedPlayerId) return;
     setMessage(null);
     setError(null);
     setIsSubmitting(true);
     const res = await fetch(`/api/games/${selectedGameId}/admin-adjust`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, resultType, action })
+      body: JSON.stringify({ playerId: selectedPlayerId, resultType, action })
     });
     setIsSubmitting(false);
 
@@ -161,220 +162,243 @@ export function AdminGameWorkbench({
   };
 
   return (
-    <section className="h-full min-w-0 space-y-3 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
-      <div>
+    <section className="flex min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-garnet-100 bg-white/85 shadow lg:h-[min(70vh,52rem)]">
+      <div className="shrink-0 border-b border-garnet-100 px-4 py-3 sm:px-5">
         <p className="text-xs uppercase tracking-wide text-garnet-600">Corrections</p>
         <h2 className="text-lg font-semibold text-ink">Game score editor</h2>
-        <p className="text-xs text-ash">
-          Select a finalized tracked game, review player cup totals, and apply commissioner fixes.
-        </p>
+        <p className="text-xs text-ash">Pick a game, then fix shots or cups without scrolling the whole page.</p>
       </div>
 
-      <label className="block text-xs uppercase tracking-wide text-ash">
-        Find game
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="mt-1 w-full rounded-lg border border-garnet-100 bg-white px-3 py-2 text-sm text-ink"
-          placeholder="Search by team, week, type"
-        />
-      </label>
-
-      <div className="max-h-56 space-y-1 overflow-y-auto overflow-x-hidden rounded-xl border border-garnet-100 bg-parchment/50 p-2">
-        {filteredGames.map((game) => (
-          <button
-            key={game.id}
-            type="button"
-            onClick={() => setSelectedGameId(game.id)}
-            className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-              selectedGameId === game.id
-                ? 'border-garnet-300 bg-gold-50'
-                : 'border-garnet-100 bg-white hover:bg-gold-50/70'
-            }`}
-          >
-            <p className="text-sm font-semibold text-ink">{game.label}</p>
-            <p className="text-xs text-ash">{game.sublabel}</p>
-          </button>
-        ))}
-        {filteredGames.length === 0 && (
-          <p className="px-3 py-2 text-sm text-ash">No games match your search.</p>
-        )}
-      </div>
-
-      {!selectedGameId && (
-        <p className="rounded-xl border border-garnet-100 bg-white px-3 py-2 text-sm text-ash">
-          No finalized tracked games available.
-        </p>
-      )}
-
-      {selectedGameId && (
-        <div className="min-w-0 space-y-3">
-          <div className="rounded-xl border border-garnet-100 bg-parchment/70 p-3">
-            <p className="text-sm font-semibold text-ink">
-              {snapshot?.game.homeTeamName ?? 'Home'} vs {snapshot?.game.awayTeamName ?? 'Away'}
-            </p>
-            <p className="text-xs text-ash">
-              {snapshot?.game.week ? `Week ${snapshot.game.week}` : 'No week'} ·{' '}
-              {snapshot ? new Date(snapshot.game.startedAt).toLocaleDateString() : 'Loading...'}
-            </p>
-            <p className="mt-1 text-xs text-garnet-700">
-              Remaining: {snapshot?.game.homeTeamName ?? 'Home'} {snapshot?.game.homeCupsRemaining ?? '—'} ·{' '}
-              {snapshot?.game.awayTeamName ?? 'Away'} {snapshot?.game.awayCupsRemaining ?? '—'}
-            </p>
-            <Link href={`/games/${selectedGameId}`} className="mt-2 inline-flex text-xs font-semibold text-garnet-600 hover:text-garnet-500">
-              Open game page
-            </Link>
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col border-b border-garnet-100 lg:border-b-0 lg:border-r">
+          <label className="shrink-0 px-3 pt-3 text-[11px] font-semibold uppercase tracking-wide text-ash">
+            Find game
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="mt-1 min-h-11 w-full rounded-lg border border-garnet-100 bg-white px-3 py-2 text-sm text-ink"
+              placeholder="Team, week, type"
+            />
+          </label>
+          <div className="max-h-48 min-h-0 flex-1 overflow-y-auto p-2 lg:max-h-none">
+            {filteredGames.map((game) => (
+              <button
+                key={game.id}
+                type="button"
+                onClick={() => selectGame(game.id)}
+                className={`mb-1 w-full rounded-lg border px-3 py-2 text-left transition ${
+                  selectedGameId === game.id
+                    ? 'border-garnet-300 bg-gold-50'
+                    : 'border-transparent bg-white hover:border-garnet-100 hover:bg-gold-50/70'
+                }`}
+              >
+                <p className="text-sm font-semibold text-ink">{game.label}</p>
+                <p className="text-xs text-ash">{game.sublabel}</p>
+              </button>
+            ))}
+            {filteredGames.length === 0 && (
+              <p className="px-3 py-2 text-sm text-ash">No games match your search.</p>
+            )}
           </div>
+        </aside>
 
-          <div className="rounded-xl border border-garnet-100 bg-white/90 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-garnet-600">Per-player cups (before adjust)</p>
-            <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-garnet-100">
-              <table className="min-w-[680px] text-left text-sm sm:min-w-full">
-                <thead className="sticky top-0 bg-parchment/90 text-[11px] uppercase tracking-wide text-ash">
-                  <tr>
-                    <th className="px-2 py-2">Player</th>
-                    <th className="px-2 py-2">Team</th>
-                    <th className="px-2 py-2 text-center">Total</th>
-                    <th className="px-2 py-2 text-center">Top</th>
-                    <th className="px-2 py-2 text-center">Top ISO</th>
-                    <th className="px-2 py-2 text-center">Bottom</th>
-                    <th className="px-2 py-2 text-center">Bottom ISO</th>
-                    <th className="px-2 py-2 text-center">Misses</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(snapshot?.players ?? []).map((player) => (
-                    <tr key={player.id} className="border-t border-garnet-100 bg-white/80">
-                      <td className="px-2 py-2 font-semibold text-ink">{player.name}</td>
-                      <td className="px-2 py-2 text-ash">{player.teamName}</td>
-                      <td className="px-2 py-2 text-center text-garnet-700">{player.totalMakes}</td>
-                      <td className="px-2 py-2 text-center">{player.topRegular}</td>
-                      <td className="px-2 py-2 text-center">{player.topIso}</td>
-                      <td className="px-2 py-2 text-center">{player.bottomRegular}</td>
-                      <td className="px-2 py-2 text-center">{player.bottomIso}</td>
-                      <td className="px-2 py-2 text-center">{player.misses}</td>
-                    </tr>
-                  ))}
-                  {!snapshot?.players?.length && !isLoading && (
+        <div className="flex min-h-0 flex-col">
+          {!selectedGameId && (
+            <p className="p-4 text-sm text-ash">No finalized tracked games available.</p>
+          )}
+
+          {selectedGameId && (
+            <>
+              <div className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-garnet-100 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">
+                    {snapshot?.game.homeTeamName ?? 'Home'} vs {snapshot?.game.awayTeamName ?? 'Away'}
+                  </p>
+                  <p className="text-xs text-ash">
+                    {snapshot?.game.week ? `Week ${snapshot.game.week}` : 'No week'} ·{' '}
+                    {snapshot ? new Date(snapshot.game.startedAt).toLocaleDateString() : 'Loading...'}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-garnet-700">
+                    Remaining: {snapshot?.game.homeTeamName ?? 'Home'} {snapshot?.game.homeCupsRemaining ?? '—'} ·{' '}
+                    {snapshot?.game.awayTeamName ?? 'Away'} {snapshot?.game.awayCupsRemaining ?? '—'}
+                  </p>
+                </div>
+                <Link
+                  href={`/games/${selectedGameId}`}
+                  className="text-xs font-semibold text-garnet-600 hover:text-garnet-500"
+                >
+                  Open game page
+                </Link>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto">
+                <table className="min-w-[640px] w-full text-left text-sm">
+                  <thead className="sticky top-0 bg-parchment text-[11px] uppercase tracking-wide text-ash">
                     <tr>
-                      <td className="px-2 py-3 text-ash" colSpan={8}>
-                        No lineup players in this game.
-                      </td>
+                      <th className="px-3 py-2">Player</th>
+                      <th className="px-3 py-2">Team</th>
+                      <th className="px-3 py-2 text-center">Total</th>
+                      <th className="px-3 py-2 text-center">Top</th>
+                      <th className="px-3 py-2 text-center">Top ISO</th>
+                      <th className="px-3 py-2 text-center">Bottom</th>
+                      <th className="px-3 py-2 text-center">Bottom ISO</th>
+                      <th className="px-3 py-2 text-center">Misses</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                  </thead>
+                  <tbody>
+                    {(snapshot?.players ?? []).map((player) => {
+                      const selected = player.id === selectedPlayerId;
+                      return (
+                        <tr
+                          key={player.id}
+                          onClick={() => setPlayerId(player.id)}
+                          className={`cursor-pointer border-t border-garnet-100 ${
+                            selected ? 'bg-gold-50' : 'bg-white hover:bg-gold-50/50'
+                          }`}
+                        >
+                          <td className="px-3 py-2 font-semibold text-ink">{player.name}</td>
+                          <td className="px-3 py-2 text-ash">{player.teamName}</td>
+                          <td className="px-3 py-2 text-center font-semibold text-garnet-700">{player.totalMakes}</td>
+                          <td className="px-3 py-2 text-center">{player.topRegular}</td>
+                          <td className="px-3 py-2 text-center">{player.topIso}</td>
+                          <td className="px-3 py-2 text-center">{player.bottomRegular}</td>
+                          <td className="px-3 py-2 text-center">{player.bottomIso}</td>
+                          <td className="px-3 py-2 text-center">{player.misses}</td>
+                        </tr>
+                      );
+                    })}
+                    {!snapshot?.players?.length && !isLoading && (
+                      <tr>
+                        <td className="px-3 py-3 text-ash" colSpan={8}>
+                          No lineup players in this game.
+                        </td>
+                      </tr>
+                    )}
+                    {isLoading && (
+                      <tr>
+                        <td className="px-3 py-3 text-ash" colSpan={8}>
+                          Loading box score...
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className="min-w-0 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Player shot correction</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="space-y-1 text-xs text-ash">
-                  Player
-                  <select
-                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
-                    value={playerId}
-                    onChange={(event) => setPlayerId(event.target.value)}
-                    disabled={isSubmitting}
-                  >
-                    {(snapshot?.players ?? []).map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name} ({player.teamName})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-1 text-xs text-ash">
-                  Shot type
-                  <select
-                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
-                    value={resultType}
-                    onChange={(event) => setResultType(event.target.value as ResultType)}
-                    disabled={isSubmitting}
-                  >
-                    {shotOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => submitPlayer('ADD')}
-                  disabled={isSubmitting || !playerId}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  Add shot
-                </button>
-                <button
-                  type="button"
-                  onClick={() => submitPlayer('SUBTRACT')}
-                  disabled={isSubmitting || !playerId}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
-                >
-                  Remove shot
-                </button>
-              </div>
-            </div>
+              <div className="shrink-0 space-y-2 border-t border-garnet-100 bg-parchment/60 p-3">
+                {(message || error) && (
+                  <p className={`text-xs ${error ? 'text-rose-700' : 'text-emerald-700'}`}>{error ?? message}</p>
+                )}
+                <div className="grid gap-3 xl:grid-cols-2">
+                  <div className="min-w-0 rounded-xl border border-rose-200 bg-white p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-700">Player shot</p>
+                    <p className="mt-0.5 text-xs text-ash">Click a row or pick a player, then add or remove one shot.</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="space-y-1 text-xs text-ash">
+                        Player
+                        <select
+                          className="min-h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                          value={selectedPlayerId}
+                          onChange={(event) => setPlayerId(event.target.value)}
+                          disabled={isSubmitting}
+                        >
+                          {(snapshot?.players ?? []).map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.name} ({player.teamName})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-xs text-ash">
+                        Shot type
+                        <select
+                          className="min-h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                          value={resultType}
+                          onChange={(event) => setResultType(event.target.value as ResultType)}
+                          disabled={isSubmitting}
+                        >
+                          {shotOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => submitPlayer('ADD')}
+                        disabled={isSubmitting || !selectedPlayerId}
+                        className="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        Add shot
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitPlayer('SUBTRACT')}
+                        disabled={isSubmitting || !selectedPlayerId}
+                        className="inline-flex h-11 items-center justify-center rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+                      >
+                        Remove shot
+                      </button>
+                    </div>
+                  </div>
 
-            <div className="min-w-0 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Side cup correction</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="space-y-1 text-xs text-ash">
-                  Side
-                  <select
-                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
-                    value={side}
-                    onChange={(event) => setSide(event.target.value as 'HOME' | 'AWAY')}
-                    disabled={isSubmitting}
-                  >
-                    <option value="HOME">{snapshot?.game.homeTeamName ?? 'Home'}&apos;s side</option>
-                    <option value="AWAY">{snapshot?.game.awayTeamName ?? 'Away'}&apos;s side</option>
-                  </select>
-                </label>
-                <label className="space-y-1 text-xs text-ash">
-                  Cups
-                  <input
-                    type="number"
-                    min={1}
-                    max={25}
-                    value={sideCount}
-                    onChange={(event) => setSideCount(Number(event.target.value))}
-                    className="h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
-                    disabled={isSubmitting}
-                  />
-                </label>
+                  <div className="min-w-0 rounded-xl border border-rose-200 bg-white p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-700">Side cups</p>
+                    <p className="mt-0.5 text-xs text-ash">Pull or add cups on a team’s rack.</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="space-y-1 text-xs text-ash">
+                        Side
+                        <select
+                          className="min-h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                          value={side}
+                          onChange={(event) => setSide(event.target.value as 'HOME' | 'AWAY')}
+                          disabled={isSubmitting}
+                        >
+                          <option value="HOME">{snapshot?.game.homeTeamName ?? 'Home'}&apos;s side</option>
+                          <option value="AWAY">{snapshot?.game.awayTeamName ?? 'Away'}&apos;s side</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-xs text-ash">
+                        Cups
+                        <input
+                          type="number"
+                          min={1}
+                          max={25}
+                          value={sideCount}
+                          onChange={(event) => setSideCount(Number(event.target.value))}
+                          className="min-h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-ink"
+                          disabled={isSubmitting}
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => submitSide('PULL')}
+                        disabled={isSubmitting}
+                        className="inline-flex h-11 items-center justify-center rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+                      >
+                        Pull cups
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitSide('ADD')}
+                        disabled={isSubmitting}
+                        className="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        Add cups
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => submitSide('PULL')}
-                  disabled={isSubmitting}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
-                >
-                  Pull cups
-                </button>
-                <button
-                  type="button"
-                  onClick={() => submitSide('ADD')}
-                  disabled={isSubmitting}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  Add cups
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {message && <p className="text-xs text-emerald-700">{message}</p>}
-          {error && <p className="text-xs text-rose-700">{error}</p>}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }

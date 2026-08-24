@@ -34,9 +34,10 @@ type PlayerImpact = {
   tempoPoints: number;
 };
 
-export default async function TeamPage({ params }: { params: { id: string } }) {
+export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const team = await prisma.team.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       season: true,
       conference: true,

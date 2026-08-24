@@ -13,19 +13,21 @@ export function RequestAccessForm() {
 
   useEffect(() => {
     if (!email || !email.includes('@')) {
-      setLookupStatus('idle');
       return;
     }
 
+    const controller = new AbortController();
     const timeout = setTimeout(async () => {
       setLookupStatus('loading');
       try {
         const res = await fetch('/api/auth/lookup-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ email }),
+          signal: controller.signal
         });
         const data = await res.json().catch(() => ({}));
+        if (controller.signal.aborted) return;
         if (res.ok && data?.found) {
           setMappedName(data?.name ?? '');
           setLookupStatus('found');
@@ -34,12 +36,16 @@ export function RequestAccessForm() {
         setMappedName('');
         setLookupStatus('missing');
       } catch {
+        if (controller.signal.aborted) return;
         setMappedName('');
         setLookupStatus('missing');
       }
     }, 300);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [email]);
 
   const onSubmit = async (event: React.FormEvent) => {
@@ -98,6 +104,8 @@ export function RequestAccessForm() {
           value={email}
           onChange={(event) => {
             setEmail(event.target.value);
+            setLookupStatus('idle');
+            setMappedName('');
             if (status !== 'idle') {
               setStatus('idle');
               setMessage(null);

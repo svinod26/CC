@@ -50,11 +50,12 @@ const maxFrom = (rows: PlayerAgg[], valueFor: (row: PlayerAgg) => number) => {
 export default async function PlayerHubPage({
   searchParams
 }: {
-  searchParams?: { season?: string; type?: string };
+  searchParams?: Promise<{ season?: string; type?: string }>;
 }) {
+  const query = (await searchParams) ?? {};
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
-  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, searchParams?.season);
-  const typeValue = searchParams?.type ?? 'LEAGUE';
+  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, query.season);
+  const typeValue = query.type ?? 'LEAGUE';
   const typeFilter = typeValue === 'all' ? undefined : (typeValue as GameType);
   const maxWeekRow = await prisma.schedule.aggregate({
     where: season ? { seasonId: season.id } : {},

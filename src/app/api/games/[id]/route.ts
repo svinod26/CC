@@ -4,14 +4,15 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { id } = await params;
   const existing = await prisma.game.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       seasonId: true,
@@ -27,10 +28,10 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
 
   await prisma.$transaction(async (tx) => {
     await tx.schedule.updateMany({
-      where: { gameId: params.id },
+      where: { gameId: id },
       data: { gameId: null }
     });
-    await tx.game.delete({ where: { id: params.id } });
+    await tx.game.delete({ where: { id } });
 
     // Exhibition games create ad-hoc teams (no season); remove them if this
     // was the only game referencing them so they don't pile up.

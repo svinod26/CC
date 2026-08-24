@@ -5,14 +5,15 @@ import { GameStatus } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { id } = await params;
   const game = await prisma.game.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { statTaker: true }
   });
   if (!game) {
@@ -29,8 +30,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   const lastEvent = await prisma.shotEvent.findFirst({
-    where: { gameId: params.id },
-    orderBy: { timestamp: 'desc' }
+    where: { gameId: id },
+    orderBy: [{ timestamp: 'desc' }, { id: 'desc' }]
   });
 
   if (!lastEvent) {
@@ -39,7 +40,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   await prisma.shotEvent.delete({ where: { id: lastEvent.id } });
 
-  await recomputeGameState(params.id);
+  await recomputeGameState(id);
 
   return NextResponse.json({ ok: true });
 }

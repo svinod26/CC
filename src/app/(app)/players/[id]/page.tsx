@@ -9,17 +9,18 @@ export default async function PlayerProfilePage({
   params,
   searchParams
 }: {
-  params: { id: string };
-  searchParams?: { season?: string; type?: string };
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ season?: string; type?: string }>;
 }) {
+  const [{ id }, query = {}] = await Promise.all([params, searchParams]);
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
-  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, searchParams?.season);
-  const typeValue = searchParams?.type ?? 'LEAGUE';
+  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, query.season);
+  const typeValue = query.type ?? 'LEAGUE';
   const typeFilter = typeValue === 'all' ? null : (typeValue as GameType);
 
   return (
     <PlayerDashboard
-      playerId={params.id}
+      playerId={id}
       seasonId={season?.id ?? null}
       gameType={typeFilter}
       seasonOptions={orderedSeasons}

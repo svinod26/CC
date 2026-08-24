@@ -3,6 +3,7 @@ import { NextAuthOptions, getServerSession } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { emailCandidates } from '@/lib/email';
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -29,7 +30,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+        const candidates = emailCandidates(parsed.data.email);
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: candidates.map((email) => ({ email: { equals: email, mode: 'insensitive' } }))
+          }
+        });
         if (!user) return null;
 
         const isValid = await bcrypt.compare(parsed.data.password, user.passwordHash);

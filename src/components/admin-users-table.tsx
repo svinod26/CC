@@ -25,7 +25,7 @@ export function AdminUsersTable({ users }: { users: AdminUser[] }) {
   }, [users, query]);
 
   return (
-    <div className="flex h-full min-w-0 flex-col rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
+    <div className="flex max-h-[min(70vh,52rem)] min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-garnet-600">Accounts</p>
@@ -40,7 +40,7 @@ export function AdminUsersTable({ users }: { users: AdminUser[] }) {
         />
       </div>
 
-      <div className="mt-3 min-h-[360px] flex-1 overflow-auto rounded-xl border border-garnet-100 sm:min-h-[520px]">
+      <div className="mt-3 min-h-0 flex-1 overflow-auto rounded-xl border border-garnet-100">
         <table className="min-w-full text-left text-sm">
           <thead className="sticky top-0 bg-parchment/90 text-xs uppercase tracking-wide text-ash">
             <tr>

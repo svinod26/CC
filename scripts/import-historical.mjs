@@ -86,7 +86,7 @@ const getSheetNames = (workbook) => workbook.SheetNames.filter((name) => /^week\
 // against each season's draft/final-roster grids). Keys are normalized names.
 const SEASON_NAME_OVERRIDES = {
   F2022: { nikita: 'Nikita Tcherevik', miguel: 'Miguel Fernandez', sebastian: 'Sebastian Dounchis' },
-  S2023: { nikita: 'Nikita Tcherevik', zhou: 'Mike Zhou' },
+  S2023: { nikita: 'Nikita Tcherevik' }, // bare "Zhou" = Kevin Zhou (per commissioner)
   S2024: { miguel: 'Miguel Fernandez', david: 'David Zhang' },
   F2024: { nikita: 'Nikita Sakharuk', will: 'Will Blankenship' },
   S2025: { nikita: 'Nikita Sakharuk', will: 'Will Blankenship', david: 'David Pinero-Jacome' }

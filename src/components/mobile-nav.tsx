@@ -7,21 +7,18 @@ import { ChevronDown } from 'lucide-react';
 type NavLink = { href: string; label: string };
 
 export function MobileNav({ links }: { links: NavLink[] }) {
-  const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const [menuState, setMenuState] = useState({ pathname, open: false });
+  const open = menuState.pathname === pathname && menuState.open;
   const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
     const handleOutside = (event: MouseEvent | TouchEvent) => {
       if (!containerRef.current) return;
       if (!containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
+        setMenuState({ pathname, open: false });
       }
     };
     document.addEventListener('mousedown', handleOutside);
@@ -30,10 +27,10 @@ export function MobileNav({ links }: { links: NavLink[] }) {
       document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('touchstart', handleOutside);
     };
-  }, [open]);
+  }, [open, pathname]);
 
   const handleNav = (href: string) => {
-    setOpen(false);
+    setMenuState({ pathname, open: false });
     router.push(href);
   };
 
@@ -41,7 +38,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
     <div ref={containerRef} className="relative sm:hidden">
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => setMenuState({ pathname, open: !open })}
         className="inline-flex items-center gap-2 rounded-full bg-garnet-600 px-3 py-2 text-xs font-semibold text-sand shadow ring-1 ring-gold-300/70"
       >
         Century Cup

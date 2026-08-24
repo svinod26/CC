@@ -13,8 +13,9 @@ export const metadata = {
 export default async function AdminPage({
   searchParams
 }: {
-  searchParams?: { game?: string };
+  searchParams?: Promise<{ game?: string }>;
 }) {
+  const query = (await searchParams) ?? {};
   const session = await getServerAuthSession();
   const isAdmin = session?.user?.role === 'ADMIN';
 
@@ -54,8 +55,8 @@ export default async function AdminPage({
   });
 
   const selectedGameId =
-    searchParams?.game && games.some((game) => game.id === searchParams.game)
-      ? searchParams.game
+    query.game && games.some((game) => game.id === query.game)
+      ? query.game
       : games[0]?.id ?? null;
 
   const gameOptions = games.map((game) => {
@@ -88,7 +89,7 @@ export default async function AdminPage({
         </div>
       </section>
 
-      <section className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.9fr)]">
         <AdminGameWorkbench games={gameOptions} initialGameId={selectedGameId} />
         <AdminUsersTable
           users={users.map((user) => ({

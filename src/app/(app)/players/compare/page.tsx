@@ -84,11 +84,12 @@ const buildEmpty = (id: string, name: string, weekCount: number): PlayerStat => 
 export default async function PlayerComparePage({
   searchParams
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
+  const query = await searchParams;
   const seasons = await prisma.season.findMany({ orderBy: { year: 'desc' } });
-  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, searchParams.season);
-  const typeValue = searchParams.type ?? 'LEAGUE';
+  const { season, value: seasonValue, seasons: orderedSeasons } = resolveSeasonSelection(seasons, query.season);
+  const typeValue = query.type ?? 'LEAGUE';
   const typeFilter = typeValue === 'all' ? undefined : (typeValue as GameType);
   const maxWeekRow = await prisma.schedule.aggregate({
     where: season ? { seasonId: season.id } : {},
@@ -96,7 +97,7 @@ export default async function PlayerComparePage({
   });
   const weekCount = Math.max(maxWeekRow._max.week ?? 7, 7);
   const players = await prisma.player.findMany({ orderBy: { name: 'asc' } });
-  const selectedIds = [searchParams.a, searchParams.b].filter((id): id is string => Boolean(id));
+  const selectedIds = [query.a, query.b].filter((id): id is string => Boolean(id));
 
   const latestWeekEntry =
     typeFilter === GameType.EXHIBITION
@@ -119,9 +120,9 @@ export default async function PlayerComparePage({
           orderBy: { week: 'desc' }
         });
   const latestWeek = latestWeekEntry?.week ?? null;
-  const mode = searchParams.mode ?? 'overall';
+  const mode = query.mode ?? 'overall';
   const selectedWeek =
-    mode === 'latest' ? latestWeek : mode === 'week' ? Number(searchParams.week ?? 0) || null : null;
+    mode === 'latest' ? latestWeek : mode === 'week' ? Number(query.week ?? 0) || null : null;
 
   const gameWhere = {
     ...(season ? { seasonId: season.id } : {}),
@@ -317,7 +318,7 @@ export default async function PlayerComparePage({
           <select
             name="a"
             className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
-            defaultValue={searchParams.a ?? ''}
+            defaultValue={query.a ?? ''}
           >
             <option value="">Select player</option>
             {players.map((player) => (
@@ -332,7 +333,7 @@ export default async function PlayerComparePage({
           <select
             name="b"
             className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
-            defaultValue={searchParams.b ?? ''}
+            defaultValue={query.b ?? ''}
           >
             <option value="">Select player</option>
             {players.map((player) => (
@@ -347,7 +348,7 @@ export default async function PlayerComparePage({
           <select
             name="mode"
             className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
-            defaultValue={searchParams.mode ?? 'overall'}
+            defaultValue={query.mode ?? 'overall'}
           >
             <option value="overall">Overall season</option>
             <option value="latest">Latest week</option>
@@ -359,7 +360,7 @@ export default async function PlayerComparePage({
           <select
             name="week"
             className="mt-2 w-full rounded-xl border border-garnet-200 bg-white/80 px-3 py-2 text-sm text-ink shadow-sm"
-            defaultValue={searchParams.week ?? ''}
+            defaultValue={query.week ?? ''}
           >
             <option value="">—</option>
             {Array.from({ length: weekCount }, (_, idx) => idx + 1).map((week) => (
