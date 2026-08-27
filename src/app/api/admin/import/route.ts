@@ -15,6 +15,9 @@ const MAX_WORKBOOK_BYTES = 10 * 1024 * 1024;
 
 class ImportValidationError extends Error {}
 
+const normalizePlayerKey = (value: string) =>
+  value.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ').toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.role !== 'ADMIN') {
@@ -118,15 +121,30 @@ export async function POST(req: Request) {
         }
 
         for (const player of parsedWorkbook.players) {
-          const lookup = player.email
+          let lookup = player.email
             ? await tx.player.findFirst({
                 where: { email: { equals: player.email, mode: 'insensitive' } }
               })
             : await tx.player.findFirst({
                 where: { name: { equals: player.name, mode: 'insensitive' } }
               });
+
+          let matchedByAlias = false;
+          if (!lookup && !player.email) {
+            const alias = await tx.playerAlias.findUnique({
+              where: { aliasKey: normalizePlayerKey(player.name) },
+              include: { player: true }
+            });
+            if (alias) {
+              lookup = alias.player;
+              matchedByAlias = true;
+            }
+          }
+
           const createdPlayer = lookup
-            ? await tx.player.update({
+            ? matchedByAlias
+              ? lookup
+              : await tx.player.update({
                 where: { id: lookup.id },
                 data: { name: player.name, email: player.email || lookup.email || null }
               })

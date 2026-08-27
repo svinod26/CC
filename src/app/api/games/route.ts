@@ -29,6 +29,9 @@ class GameSetupError extends Error {
   }
 }
 
+const normalizePlayerKey = (value: string) =>
+  value.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ').toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -101,13 +104,20 @@ export async function POST(req: Request) {
 
       if (data.type === GameType.EXHIBITION) {
         const allNames = [...normalizedHomeNames, ...normalizedAwayNames];
-        const existingPlayers = await tx.player.findMany({
-          where: {
-            OR: allNames.map((name) => ({ name: { equals: name, mode: 'insensitive' } }))
-          },
-          orderBy: { createdAt: 'asc' }
-        });
+        const [existingPlayers, existingAliases] = await Promise.all([
+          tx.player.findMany({
+            where: {
+              OR: allNames.map((name) => ({ name: { equals: name, mode: 'insensitive' } }))
+            },
+            orderBy: { createdAt: 'asc' }
+          }),
+          tx.playerAlias.findMany({
+            where: { aliasKey: { in: allNames.map(normalizePlayerKey) } },
+            select: { aliasKey: true, playerId: true }
+          })
+        ]);
         const playerByName = new Map<string, string>();
+        const playerByAlias = new Map(existingAliases.map((alias) => [alias.aliasKey, alias.playerId]));
         for (const player of existingPlayers) {
           const key = normalizeName(player.name).toLocaleLowerCase();
           if (!playerByName.has(key)) playerByName.set(key, player.id);
@@ -116,7 +126,7 @@ export async function POST(req: Request) {
           const ids: string[] = [];
           for (const name of names) {
             const key = name.toLocaleLowerCase();
-            let playerId = playerByName.get(key);
+            let playerId = playerByName.get(key) ?? playerByAlias.get(normalizePlayerKey(name));
             if (!playerId) {
               const created = await tx.player.create({ data: { name } });
               playerId = created.id;
@@ -128,6 +138,10 @@ export async function POST(req: Request) {
         };
         resolvedHomeLineupIds = await resolvePlayerIds(normalizedHomeNames);
         resolvedAwayLineupIds = await resolvePlayerIds(normalizedAwayNames);
+        const resolvedLineupIds = [...resolvedHomeLineupIds, ...resolvedAwayLineupIds];
+        if (new Set(resolvedLineupIds).size !== resolvedLineupIds.length) {
+          throw new GameSetupError('Every shooter must appear only once. Check for alternate names of the same player.');
+        }
 
         const homeName = normalizeName(data.homeTeamName ?? '') || 'Exhibition Home';
         const awayName = normalizeName(data.awayTeamName ?? '') || 'Exhibition Away';
