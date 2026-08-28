@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { loadEmailMapping } from '@/lib/email-mapping';
-import { canonicalizeEmail, emailCandidates, normalizeEmail } from '@/lib/email';
+import { AccountIdentityConflictError, resolveAccountIdentity } from '@/lib/account-identity';
 import { prisma } from '@/lib/prisma';
 
 const schema = z.object({
-  email: z.string().email()
+  email: z.string().trim().email().max(254)
 });
 
 export async function POST(req: Request) {
@@ -18,41 +17,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ found: false }, { status: 400 });
   }
 
-  const email = normalizeEmail(parsed.data.email);
-  const canonicalEmail = canonicalizeEmail(email);
-  const candidateEmails = emailCandidates(email);
   try {
-    const mapping = loadEmailMapping();
-    const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
-    if (entry) {
-      return NextResponse.json({ found: true, name: entry.name });
+    const identity = await resolveAccountIdentity(prisma, parsed.data.email);
+    if (identity.player) {
+      return NextResponse.json({ found: true, name: identity.player.name });
+    }
+    if (identity.user) {
+      return NextResponse.json({ found: true, name: identity.user.name ?? 'Existing account' });
     }
   } catch (error) {
-    console.error('Lookup email mapping load failed; falling back to database lookup', error);
-  }
-
-  const player = await prisma.player.findFirst({
-    where: {
-      OR: candidateEmails.map((candidate) => ({
-        email: { equals: candidate, mode: 'insensitive' }
-      }))
-    },
-    select: { name: true }
-  });
-  if (player?.name) {
-    return NextResponse.json({ found: true, name: player.name });
-  }
-
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: candidateEmails.map((candidate) => ({
-        email: { equals: candidate, mode: 'insensitive' }
-      }))
-    },
-    select: { name: true }
-  });
-  if (user?.name) {
-    return NextResponse.json({ found: true, name: user.name });
+    if (error instanceof AccountIdentityConflictError) {
+      return NextResponse.json({ found: false }, { status: 409 });
+    }
+    console.error('Email lookup failed', error);
+    return NextResponse.json({ found: false }, { status: 500 });
   }
 
   return NextResponse.json({ found: false });

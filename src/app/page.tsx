@@ -501,8 +501,7 @@ export default async function HomePage() {
           <h2 className="mt-2 text-xl font-semibold text-ink">Recent performances</h2>
           {!player && (
             <p className="mt-4 text-sm text-ash">
-              We couldn’t match your account email to a player record yet. Ask an admin to link your email in the roster
-              import.
+              We couldn't match your account email to a player record yet. Ask an admin to add or correct your email.
             </p>
           )}
           {player && (

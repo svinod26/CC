@@ -25,13 +25,18 @@ Visit `http://localhost:3000`.
 - Admins can import Excel and manage seasons; users can start/exhibit games and log stats.
 
 ## Email access (Resend)
-This app can email temporary passwords based on `Name_email_mapping.xlsx`.
+This app emails temporary passwords to addresses stored on Player or existing User records in Postgres. The database is
+the runtime source of truth for account identity; `Name_email_mapping.xlsx` is retained only as a legacy import/reference
+artifact and changing it does not change signup access.
 
 1. Create a Resend account and verify a sending domain (see Resend docs).
 2. Add these to `.env`:
    - `RESEND_API_KEY`
    - `RESEND_FROM` (ex: `Century Cup <noreply@mail.yourdomain.com>`)
 3. Users go to `/signin` → “Email me a password.”
+
+Players become eligible for signup when their `Player.email` value is populated. Existing standalone User accounts (for
+example, a commissioner account without a Player record) can also request a new password.
 
 Passwords are generated on request and emailed in plaintext (per your preference).
 

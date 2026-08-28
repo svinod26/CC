@@ -5,6 +5,7 @@ node_modules
 .env
 .env.local
 .env.development
+.DS_Store
 pnpm-lock.yaml
 yarn.lock
 prisma/dev.db

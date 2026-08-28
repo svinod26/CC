@@ -3,15 +3,16 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { loadEmailMapping } from '@/lib/email-mapping';
-import { canonicalizeEmail, normalizeEmail } from '@/lib/email';
+import { AccountIdentityConflictError, resolveAccountIdentity } from '@/lib/account-identity';
 import { sendResendEmail } from '@/lib/resend';
 
 const requestSchema = z.object({
-  email: z.string().email()
+  email: z.string().trim().email().max(254)
 });
 
 const generatePassword = () => randomBytes(9).toString('base64url');
+
+class AccountIdentityChangedError extends Error {}
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => null);
@@ -23,52 +24,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
   }
 
-  const email = normalizeEmail(parsed.data.email);
-  const canonicalEmail = canonicalizeEmail(email);
-  let resolvedName: string | null = null;
-  let mappedEmail: string | null = null;
+  let identity;
   try {
-    const mapping = loadEmailMapping();
-    const entry = mapping.get(email) ?? mapping.get(canonicalEmail);
-    resolvedName = entry?.name ?? null;
-    mappedEmail = entry?.email ? normalizeEmail(entry.email) : null;
+    identity = await resolveAccountIdentity(prisma, parsed.data.email);
   } catch (error) {
-    console.error('Email mapping load failed; falling back to database lookup', error);
-  }
-  const accountEmail = mappedEmail ?? email;
-  const candidateEmailSet = new Set([email, canonicalEmail, accountEmail, canonicalizeEmail(accountEmail)]);
-  const candidateEmailList = Array.from(candidateEmailSet);
-
-  if (!resolvedName) {
-    const playerByEmail = await prisma.player.findFirst({
-      where: {
-        OR: candidateEmailList.map((candidate) => ({
-          email: { equals: candidate, mode: 'insensitive' }
-        }))
-      },
-      select: { name: true }
-    });
-    resolvedName = playerByEmail?.name ?? null;
-  }
-  if (!resolvedName) {
-    const userByEmail = await prisma.user.findFirst({
-      where: {
-        OR: candidateEmailList.map((candidate) => ({
-          email: { equals: candidate, mode: 'insensitive' }
-        }))
-      },
-      select: { name: true }
-    });
-    resolvedName = userByEmail?.name ?? null;
+    if (error instanceof AccountIdentityConflictError) {
+      return NextResponse.json(
+        { error: 'This email matches multiple records. Ask the commissioner to correct the account records.' },
+        { status: 409 }
+      );
+    }
+    console.error('Request access identity lookup failed', error);
+    return NextResponse.json({ error: 'Unable to check that email right now.' }, { status: 500 });
   }
 
-  if (!resolvedName) {
+  if (!identity.accountEmail || (!identity.player && !identity.user)) {
     return NextResponse.json(
-      { error: 'Email not recognized. Use your roster email or ask the commissioner to add/link it.' },
+      { error: 'Email not recognized. Use the email on your player record or ask the commissioner to add it.' },
       { status: 404 }
     );
   }
 
+  const accountEmail = identity.accountEmail;
+  const resolvedName = identity.player?.name ?? identity.user?.name ?? 'there';
   const password = generatePassword();
   const passwordHash = await bcrypt.hash(password, 10);
   const appUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
@@ -104,56 +82,44 @@ You can request a new password anytime from ${appUrl}/signup.`;
 
   try {
     await prisma.$transaction(async (tx) => {
-      const existingUser = await tx.user.findFirst({
-        where: {
-          OR: candidateEmailList.map((candidate) => ({
-            email: { equals: candidate, mode: 'insensitive' }
-          }))
-        }
-      });
-      if (existingUser) {
+      const currentIdentity = await resolveAccountIdentity(tx, parsed.data.email);
+      if (
+        currentIdentity.accountEmail !== accountEmail ||
+        currentIdentity.player?.id !== identity.player?.id ||
+        currentIdentity.user?.id !== identity.user?.id
+      ) {
+        throw new AccountIdentityChangedError();
+      }
+
+      if (currentIdentity.user) {
         await tx.user.update({
-          where: { id: existingUser.id },
+          where: { id: currentIdentity.user.id },
           data: {
-            email: accountEmail,
             passwordHash,
-            name: resolvedName
+            ...(currentIdentity.player
+              ? { email: accountEmail, name: currentIdentity.player.name }
+              : {})
           }
         });
-      } else {
+      } else if (currentIdentity.player) {
         await tx.user.create({
           data: {
             email: accountEmail,
-            name: resolvedName,
+            name: currentIdentity.player.name,
             passwordHash,
             role: 'USER'
           }
         });
       }
-
-      const player = await tx.player.findFirst({
-        where: {
-          OR: candidateEmailList.map((candidate) => ({
-            email: { equals: candidate, mode: 'insensitive' }
-          }))
-        }
-      });
-      if (!player) {
-        const byName = await tx.player.findFirst({ where: { name: resolvedName } });
-        if (byName && !byName.email) {
-          await tx.player.update({ where: { id: byName.id }, data: { email: accountEmail } });
-        } else if (!byName) {
-          await tx.player.create({
-            data: {
-              name: resolvedName,
-              email: accountEmail
-            }
-          });
-        }
-      }
     });
   } catch (error) {
     console.error('Request access persistence failed', error);
+    if (error instanceof AccountIdentityChangedError || error instanceof AccountIdentityConflictError) {
+      return NextResponse.json(
+        { error: 'The account record changed while processing. Please request a new password again.' },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { error: 'Account setup failed after email send. Request a new password and try again.' },
       { status: 500 }

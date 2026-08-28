@@ -29,7 +29,7 @@ export default async function DashboardPage({
       <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 text-ink shadow sm:p-6">
         <h1 className="text-2xl font-bold text-ink">My dashboard</h1>
         <p className="mt-2 text-ash">
-          We couldn’t match your email to a player record. Ask an admin to link your email in the roster import.
+          We couldn't match your email to a player record. Ask an admin to add or correct your email.
         </p>
       </div>
     );

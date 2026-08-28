@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  outputFileTracingIncludes: {
-    '/*': ['./Name_email_mapping.xlsx']
-  },
   async headers() {
     return [
       {

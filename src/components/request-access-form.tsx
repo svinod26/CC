@@ -123,7 +123,7 @@ export function RequestAccessForm() {
 
       {lookupStatus === 'missing' && (
         <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-700">
-          Email not found in roster mapping. Use the exact email on file with the commissioner.
+          Email not found on a player record or existing account. Ask the commissioner to add or correct it.
         </div>
       )}
 
