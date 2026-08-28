@@ -26,6 +26,10 @@ const toSummary = (entry: {
     const side = String(details?.side ?? '').toLowerCase();
     return `Added ${count} on ${side} side`;
   }
+  if (entry.action === 'ACCOUNT_EMAIL_UPDATE') {
+    const targetName = String(details?.targetName ?? 'account');
+    return `Updated email for ${targetName}`;
+  }
   return entry.action.replaceAll('_', ' ');
 };
 

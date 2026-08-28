@@ -1,5 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import { logAdminAudit } from '@/lib/admin-audit';
+import { canonicalizeEmail, normalizeEmail } from '@/lib/email';
 import { parseWorkbook } from '@/lib/excel';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
@@ -12,6 +13,7 @@ const importSchema = z.object({
 });
 
 const MAX_WORKBOOK_BYTES = 10 * 1024 * 1024;
+const workbookEmailSchema = z.string().email().max(254);
 
 class ImportValidationError extends Error {}
 
@@ -121,36 +123,85 @@ export async function POST(req: Request) {
         }
 
         for (const player of parsedWorkbook.players) {
-          let lookup = player.email
-            ? await tx.player.findFirst({
-                where: { email: { equals: player.email, mode: 'insensitive' } }
-              })
-            : await tx.player.findFirst({
-                where: { name: { equals: player.name, mode: 'insensitive' } }
-              });
-
-          let matchedByAlias = false;
-          if (!lookup && !player.email) {
-            const alias = await tx.playerAlias.findUnique({
-              where: { aliasKey: normalizePlayerKey(player.name) },
-              include: { player: true }
-            });
-            if (alias) {
-              lookup = alias.player;
-              matchedByAlias = true;
-            }
+          const workbookEmail = player.email ? normalizeEmail(player.email) : null;
+          if (workbookEmail && !workbookEmailSchema.safeParse(workbookEmail).success) {
+            throw new ImportValidationError(`Invalid email for ${player.name}.`);
           }
 
-          const createdPlayer = lookup
-            ? matchedByAlias
-              ? lookup
-              : await tx.player.update({
-                where: { id: lookup.id },
-                data: { name: player.name, email: player.email || lookup.email || null }
-              })
-            : await tx.player.create({
-                data: { name: player.name, email: player.email || null }
-              });
+          const [emailedPlayers, nameMatches, alias] = await Promise.all([
+            workbookEmail
+              ? tx.player.findMany({ where: { email: { not: null } } })
+              : Promise.resolve([]),
+            tx.player.findMany({
+              where: { name: { equals: player.name, mode: 'insensitive' } }
+            }),
+            tx.playerAlias.findUnique({
+              where: { aliasKey: normalizePlayerKey(player.name) },
+              include: { player: true }
+            })
+          ]);
+
+          if (nameMatches.length > 1) {
+            throw new ImportValidationError(
+              `Multiple existing players use the name ${player.name}. Resolve them before importing.`
+            );
+          }
+
+          const canonicalWorkbookEmail = workbookEmail
+            ? canonicalizeEmail(workbookEmail)
+            : null;
+          const emailMatches = canonicalWorkbookEmail
+            ? emailedPlayers.filter(
+                (existing) =>
+                  existing.email && canonicalizeEmail(existing.email) === canonicalWorkbookEmail
+              )
+            : [];
+          if (emailMatches.length > 1) {
+            throw new ImportValidationError(
+              `Multiple existing players use the email for ${player.name}. Resolve them before importing.`
+            );
+          }
+
+          const candidates = [emailMatches[0] ?? null, nameMatches[0] ?? null, alias?.player ?? null]
+            .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+          const candidateIds = new Set(candidates.map((candidate) => candidate.id));
+          if (candidateIds.size > 1) {
+            throw new ImportValidationError(
+              `The name and email for ${player.name} resolve to different Player records.`
+            );
+          }
+
+          const lookup = candidates[0] ?? null;
+          let createdPlayer;
+          if (lookup) {
+            if (
+              workbookEmail &&
+              lookup.email &&
+              canonicalizeEmail(lookup.email) !== canonicalWorkbookEmail
+            ) {
+              throw new ImportValidationError(
+                `${player.name} already has a different database email. Correct the workbook before importing.`
+              );
+            }
+
+            const matchedByAlias = Boolean(
+              alias?.playerId === lookup.id &&
+                player.name.trim().toLocaleLowerCase() !== lookup.name.trim().toLocaleLowerCase()
+            );
+            const nextName = matchedByAlias ? lookup.name : player.name;
+            const nextEmail = lookup.email ?? workbookEmail;
+            createdPlayer =
+              nextName === lookup.name && nextEmail === lookup.email
+                ? lookup
+                : await tx.player.update({
+                    where: { id: lookup.id },
+                    data: { name: nextName, email: nextEmail }
+                  });
+          } else {
+            createdPlayer = await tx.player.create({
+              data: { name: player.name, email: workbookEmail }
+            });
+          }
 
           const teamId = player.team ? teamMap.get(player.team) : undefined;
           if (player.team && !teamId) {

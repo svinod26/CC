@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { PlayerDashboard } from '@/components/player-dashboard';
 import { resolveSeasonSelection } from '@/lib/season';
 import { GameType } from '@prisma/client';
+import { getCurrentPlayerForUserId } from '@/lib/current-player';
 
 export default async function DashboardPage({
   searchParams
@@ -11,9 +12,9 @@ export default async function DashboardPage({
 }) {
   const query = (await searchParams) ?? {};
   const session = await getServerAuthSession();
-  const email = session?.user?.email;
+  const userId = session?.user?.id;
 
-  if (!email) {
+  if (!userId) {
     return (
       <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 text-ink shadow sm:p-6">
         <h1 className="text-2xl font-bold text-ink">My dashboard</h1>
@@ -22,14 +23,14 @@ export default async function DashboardPage({
     );
   }
 
-  const player = await prisma.player.findFirst({ where: { email } });
+  const player = await getCurrentPlayerForUserId(userId);
 
   if (!player) {
     return (
       <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 text-ink shadow sm:p-6">
         <h1 className="text-2xl font-bold text-ink">My dashboard</h1>
         <p className="mt-2 text-ash">
-          We couldn't match your email to a player record. Ask an admin to add or correct your email.
+          We couldn’t match your email to a player record. Ask an admin to add or correct your email.
         </p>
       </div>
     );

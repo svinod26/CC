@@ -2,8 +2,10 @@ import { getServerAuthSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatGameType } from '@/lib/format';
 import { AdminAuditLog } from '@/components/admin-audit-log';
+import { AdminEmailManager, type AdminEmailIdentityRow } from '@/components/admin-email-manager';
 import { AdminGameWorkbench } from '@/components/admin-game-workbench';
 import { AdminUsersTable } from '@/components/admin-users-table';
+import { canonicalizeEmail } from '@/lib/email';
 import Link from 'next/link';
 
 export const metadata = {
@@ -28,7 +30,7 @@ export default async function AdminPage({
     );
   }
 
-  const [gamesRaw, users] = await Promise.all([
+  const [gamesRaw, users, players] = await Promise.all([
     prisma.game.findMany({
       where: { statsSource: 'TRACKED', status: 'FINAL' },
       include: {
@@ -42,10 +44,71 @@ export default async function AdminPage({
     }),
     prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
-      take: 500
+      select: { id: true, name: true, email: true, role: true, createdAt: true }
+    }),
+    prisma.player.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        rosters: {
+          select: {
+            createdAt: true,
+            team: { select: { name: true } },
+            season: { select: { name: true, year: true } }
+          }
+        }
+      }
     })
   ]);
+
+  const usersByCanonicalEmail = new Map<string, typeof users>();
+  for (const user of users) {
+    const key = canonicalizeEmail(user.email);
+    usersByCanonicalEmail.set(key, [...(usersByCanonicalEmail.get(key) ?? []), user]);
+  }
+  const linkedUserIds = new Set<string>();
+  const emailIdentities: AdminEmailIdentityRow[] = players.map((player) => {
+    const matchingUsers = player.email
+      ? usersByCanonicalEmail.get(canonicalizeEmail(player.email)) ?? []
+      : [];
+    const linkedUser = matchingUsers.length === 1 ? matchingUsers[0] : null;
+    if (linkedUser) linkedUserIds.add(linkedUser.id);
+
+    const latestRoster = [...player.rosters].sort((a, b) => {
+      const yearDifference = (b.season?.year ?? -1) - (a.season?.year ?? -1);
+      if (yearDifference !== 0) return yearDifference;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    })[0];
+    const teamContext = latestRoster
+      ? [latestRoster.team?.name, latestRoster.season?.name].filter(Boolean).join(' · ') || null
+      : null;
+
+    return {
+      targetType: 'PLAYER',
+      targetId: player.id,
+      name: player.name,
+      email: player.email,
+      teamContext,
+      userId: linkedUser?.id ?? null,
+      userRole: linkedUser?.role ?? null
+    };
+  });
+
+  for (const user of users) {
+    if (linkedUserIds.has(user.id)) continue;
+    emailIdentities.push({
+      targetType: 'USER',
+      targetId: user.id,
+      name: user.name ?? 'Standalone account',
+      email: user.email,
+      teamContext: null,
+      userId: user.id,
+      userRole: user.role
+    });
+  }
+  emailIdentities.sort((a, b) => a.name.localeCompare(b.name));
 
   const games = gamesRaw.sort((a, b) => {
     const weekA = a.scheduleEntry?.week ?? -1;
@@ -98,6 +161,8 @@ export default async function AdminPage({
           }))}
         />
       </section>
+
+      <AdminEmailManager identities={emailIdentities} />
 
       <AdminAuditLog />
     </div>

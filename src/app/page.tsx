@@ -3,6 +3,7 @@ import { getServerAuthSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { ResultType } from '@prisma/client';
+import { getCurrentPlayerForUserId } from '@/lib/current-player';
 import { defaultMultipliers, isMake, isShot, winnerFromGameState } from '@/lib/stats';
 import { formatGameStatus, formatGameType } from '@/lib/format';
 import { getWeeklyRecap } from '@/lib/ai';
@@ -75,8 +76,8 @@ export default async function HomePage() {
     include: { homeTeam: true, awayTeam: true, scheduleEntry: true, state: true }
   });
 
-  const playerPromise = session?.user?.email
-    ? prisma.player.findFirst({ where: { email: session.user.email } })
+  const playerPromise = session?.user?.id
+    ? getCurrentPlayerForUserId(session.user.id)
     : Promise.resolve(null);
 
   const [recentLeagueGamesRaw, player, latestWeekEntry, inProgressGames] = await Promise.all([
@@ -501,7 +502,7 @@ export default async function HomePage() {
           <h2 className="mt-2 text-xl font-semibold text-ink">Recent performances</h2>
           {!player && (
             <p className="mt-4 text-sm text-ash">
-              We couldn't match your account email to a player record yet. Ask an admin to add or correct your email.
+              We couldn’t match your account email to a player record yet. Ask an admin to add or correct your email.
             </p>
           )}
           {player && (
