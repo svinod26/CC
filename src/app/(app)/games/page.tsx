@@ -6,6 +6,7 @@ import { GameTypeSelect } from '@/components/game-type-select';
 import { GameType } from '@prisma/client';
 import { winnerFromGameState } from '@/lib/stats';
 import { formatGameType } from '@/lib/format';
+import { formatGameDuration } from '@/lib/game-duration';
 
 export const metadata = {
   title: 'Games | Century Cup'
@@ -48,12 +49,13 @@ export default async function GamesPage({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-garnet-100 bg-white/80">
-        <table className="w-full min-w-[640px] text-sm text-ink">
+        <table className="w-full min-w-[720px] text-sm text-ink">
           <thead className="bg-gold-50 text-ash">
             <tr>
               <th className="px-3 py-2 text-left whitespace-nowrap">Matchup</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Week</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
+              <th className="px-3 py-2 text-left whitespace-nowrap">Duration</th>
               <th className="px-3 py-2 text-left whitespace-nowrap">Remaining</th>
             </tr>
           </thead>
@@ -72,6 +74,10 @@ export default async function GamesPage({
               const remaining = hasResult ? Math.max(homeRemaining, awayRemaining) : '—';
               const weekLabel = game.scheduleEntry?.week ? `Week ${game.scheduleEntry.week}` : '—';
               const dateLabel = game.startedAt ? game.startedAt.toLocaleDateString() : '—';
+              const durationLabel =
+                game.statsSource === 'LEGACY'
+                  ? 'Not recorded'
+                  : formatGameDuration(game.startedAt, game.endedAt) ?? '—';
               const href = `/games/${game.id}`;
 
               return (
@@ -121,6 +127,11 @@ export default async function GamesPage({
                   </td>
                   <td className="p-0 text-ash">
                     <Link href={href} className="block px-4 py-3">
+                      {durationLabel}
+                    </Link>
+                  </td>
+                  <td className="p-0 text-ash">
+                    <Link href={href} className="block px-4 py-3">
                       {remaining}
                     </Link>
                   </td>
@@ -129,7 +140,7 @@ export default async function GamesPage({
             })}
             {games.length === 0 && (
               <tr>
-                <td className="px-3 py-6 text-center text-ash" colSpan={4}>
+                <td className="px-3 py-6 text-center text-ash" colSpan={5}>
                   No games yet.
                 </td>
               </tr>

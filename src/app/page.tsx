@@ -8,6 +8,7 @@ import { defaultMultipliers, isMake, isShot, winnerFromGameState } from '@/lib/s
 import { formatGameStatus, formatGameType } from '@/lib/format';
 import { getWeeklyRecap } from '@/lib/ai';
 import { resolveSeasonSelection } from '@/lib/season';
+import { formatGameDuration } from '@/lib/game-duration';
 
 export default async function HomePage() {
   const session = await getServerAuthSession();
@@ -420,6 +421,12 @@ export default async function HomePage() {
                     {game.state
                       ? Math.abs(game.state.homeCupsRemaining - game.state.awayCupsRemaining)
                       : '—'}
+                  </p>
+                  <p className="mt-1 text-[10px] text-ash">
+                    Duration{' '}
+                    {game.statsSource === 'LEGACY'
+                      ? 'Not recorded'
+                      : formatGameDuration(game.startedAt, game.endedAt) ?? '—'}
                   </p>
                 </div>
               </Link>

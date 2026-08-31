@@ -11,6 +11,7 @@ import { LiveScorebug } from '@/components/live-scorebug';
 import { GameFlowChart } from '@/components/game-flow-chart';
 import { LiveGameInsights } from '@/components/live-game-insights';
 import { DeleteGameButton } from '@/components/delete-game-button';
+import { formatGameDuration } from '@/lib/game-duration';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -95,6 +96,9 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       ? 'Exhibition'
       : 'Game';
   const startedLabel = game.startedAt ? new Date(game.startedAt).toLocaleDateString() : '';
+  const durationLabel = isLegacy
+    ? 'Not recorded'
+    : formatGameDuration(game.startedAt, game.endedAt) ?? '—';
 
   const showConsole = game.status === 'IN_PROGRESS' && !isLegacy;
   const isScorer = Boolean(
@@ -146,7 +150,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
               {game.homeTeam?.name ?? 'Home'} vs {game.awayTeam?.name ?? 'Away'}
             </h1>
             <p className="text-xs text-ash">
-              {startedLabel} · {formatGameStatus(game.status)}
+              {startedLabel} · {formatGameStatus(game.status)} · Duration {durationLabel}
             </p>
           </div>
           <div className="w-full lg:w-auto">

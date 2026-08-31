@@ -128,9 +128,9 @@ export function LiveConsole({
   const isFinal = data?.state?.status === 'FINAL';
 
   useEffect(() => {
-    if (isFinal && isScorer) {
-      router.replace('/');
-    }
+    if (!isFinal) return;
+    if (isScorer) router.replace('/');
+    else router.refresh();
   }, [isFinal, isScorer, router]);
 
   useEffect(() => {
