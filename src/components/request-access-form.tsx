@@ -7,7 +7,6 @@ export function RequestAccessForm() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [lookupStatus, setLookupStatus] = useState<'idle' | 'loading' | 'found' | 'missing'>('idle');
-  const [mappedName, setMappedName] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -29,15 +28,12 @@ export function RequestAccessForm() {
         const data = await res.json().catch(() => ({}));
         if (controller.signal.aborted) return;
         if (res.ok && data?.found) {
-          setMappedName(data?.name ?? '');
           setLookupStatus('found');
           return;
         }
-        setMappedName('');
         setLookupStatus('missing');
       } catch {
         if (controller.signal.aborted) return;
-        setMappedName('');
         setLookupStatus('missing');
       }
     }, 300);
@@ -105,7 +101,6 @@ export function RequestAccessForm() {
           onChange={(event) => {
             setEmail(event.target.value);
             setLookupStatus('idle');
-            setMappedName('');
             if (status !== 'idle') {
               setStatus('idle');
               setMessage(null);
@@ -117,7 +112,7 @@ export function RequestAccessForm() {
 
       {lookupStatus === 'found' && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-700">
-          Matched roster entry: <span className="font-semibold">{mappedName}</span>
+          Email found on existing account.
         </div>
       )}
 

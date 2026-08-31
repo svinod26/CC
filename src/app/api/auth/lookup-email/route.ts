@@ -20,10 +20,10 @@ export async function POST(req: Request) {
   try {
     const identity = await resolveAccountIdentity(prisma, parsed.data.email);
     if (identity.player) {
-      return NextResponse.json({ found: true, name: identity.player.name });
+      return NextResponse.json({ found: true });
     }
     if (identity.user) {
-      return NextResponse.json({ found: true, name: identity.user.name ?? 'Existing account' });
+      return NextResponse.json({ found: true });
     }
   } catch (error) {
     if (error instanceof AccountIdentityConflictError) {
