@@ -32,18 +32,37 @@ export default async function AdminPage({
     );
   }
 
-  const [gamesRaw, users, players, seasons] = await Promise.all([
-    prisma.game.findMany({
-      where: { statsSource: 'TRACKED', status: 'FINAL' },
-      include: {
-        homeTeam: true,
-        awayTeam: true,
-        scheduleEntry: true,
-        lineups: { include: { player: true } }
-      },
-      orderBy: { startedAt: 'desc' },
-      take: 120
-    }),
+  const seasons = await prisma.season.findMany({
+    select: {
+      id: true,
+      name: true,
+      year: true,
+      teams: {
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      }
+    }
+  });
+  const latestSeason = sortSeasons(seasons)[0] ?? null;
+
+  const [gamesRaw, users, players] = await Promise.all([
+    latestSeason
+      ? prisma.game.findMany({
+          where: {
+            statsSource: 'TRACKED',
+            status: 'FINAL',
+            type: 'LEAGUE',
+            seasonId: latestSeason.id
+          },
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            scheduleEntry: true,
+            lineups: { include: { player: true } }
+          },
+          orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]
+        })
+      : Promise.resolve([]),
     prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       select: { id: true, name: true, email: true, role: true, createdAt: true }
@@ -62,21 +81,8 @@ export default async function AdminPage({
           }
         }
       }
-    }),
-    prisma.season.findMany({
-      select: {
-        id: true,
-        name: true,
-        year: true,
-        teams: {
-          select: { id: true, name: true },
-          orderBy: { name: 'asc' }
-        }
-      }
     })
   ]);
-
-  const latestSeason = sortSeasons(seasons)[0] ?? null;
 
   const usersByCanonicalEmail = new Map<string, typeof users>();
   for (const user of users) {
@@ -125,12 +131,7 @@ export default async function AdminPage({
   }
   emailIdentities.sort((a, b) => a.name.localeCompare(b.name));
 
-  const games = gamesRaw.sort((a, b) => {
-    const weekA = a.scheduleEntry?.week ?? -1;
-    const weekB = b.scheduleEntry?.week ?? -1;
-    if (weekA !== weekB) return weekB - weekA;
-    return b.startedAt.getTime() - a.startedAt.getTime();
-  });
+  const games = gamesRaw;
 
   const selectedGameId =
     query.game && games.some((game) => game.id === query.game)
