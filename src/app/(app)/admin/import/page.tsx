@@ -22,8 +22,11 @@ export default async function ImportPage() {
     <div className="space-y-5">
       <div className="rounded-3xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
         <p className="text-xs uppercase tracking-[0.2em] text-garnet-600">Data</p>
-        <h1 className="mt-2 text-3xl font-bold text-ink">Import from Excel</h1>
-        <p className="mt-2 text-sm text-ash">Use the local Century Cup workbook or upload another .xlsx.</p>
+        <h1 className="mt-2 text-3xl font-bold text-ink">Create League season</h1>
+        <p className="mt-2 text-sm text-ash">
+          Upload the standard Century Cup Excel sheet (xlsx) or enter the complete season manually, then validate every
+          roster input CAREFULLY before creating anything.
+        </p>
       </div>
       <ImportForm />
     </div>
