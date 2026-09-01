@@ -30,6 +30,12 @@ const toSummary = (entry: {
     const targetName = String(details?.targetName ?? 'account');
     return `Updated email for ${targetName}`;
   }
+  if (entry.action === 'ROSTER_PLAYER_ADD') {
+    const playerName = String(details?.playerName ?? 'player');
+    const teamName = String(details?.teamName ?? 'team');
+    const seasonName = String(details?.seasonName ?? 'season');
+    return `Added ${playerName} to ${teamName} (${seasonName})`;
+  }
   return entry.action.replaceAll('_', ' ');
 };
 

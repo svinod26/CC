@@ -4,8 +4,10 @@ import { formatGameType } from '@/lib/format';
 import { AdminAuditLog } from '@/components/admin-audit-log';
 import { AdminEmailManager, type AdminEmailIdentityRow } from '@/components/admin-email-manager';
 import { AdminGameWorkbench } from '@/components/admin-game-workbench';
+import { AdminRosterManager } from '@/components/admin-roster-manager';
 import { AdminUsersTable } from '@/components/admin-users-table';
 import { canonicalizeEmail } from '@/lib/email';
+import { sortSeasons } from '@/lib/season';
 import Link from 'next/link';
 
 export const metadata = {
@@ -30,7 +32,7 @@ export default async function AdminPage({
     );
   }
 
-  const [gamesRaw, users, players] = await Promise.all([
+  const [gamesRaw, users, players, seasons] = await Promise.all([
     prisma.game.findMany({
       where: { statsSource: 'TRACKED', status: 'FINAL' },
       include: {
@@ -60,8 +62,21 @@ export default async function AdminPage({
           }
         }
       }
+    }),
+    prisma.season.findMany({
+      select: {
+        id: true,
+        name: true,
+        year: true,
+        teams: {
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' }
+        }
+      }
     })
   ]);
+
+  const latestSeason = sortSeasons(seasons)[0] ?? null;
 
   const usersByCanonicalEmail = new Map<string, typeof users>();
   for (const user of users) {
@@ -161,6 +176,16 @@ export default async function AdminPage({
           }))}
         />
       </section>
+
+      <AdminRosterManager
+        latestSeason={latestSeason
+          ? {
+              id: latestSeason.id,
+              name: latestSeason.name,
+              teams: latestSeason.teams
+            }
+          : null}
+      />
 
       <AdminEmailManager identities={emailIdentities} />
 

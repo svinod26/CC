@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { normalizePlayerKey, normalizePlayerName } from '@/lib/player-name';
 
 const schema = z.object({
   type: z.nativeEnum(GameType),
@@ -28,9 +29,6 @@ class GameSetupError extends Error {
     super(message);
   }
 }
-
-const normalizePlayerKey = (value: string) =>
-  value.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ').toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -72,9 +70,8 @@ export async function POST(req: Request) {
   const scheduledDate = data.scheduledAt ? new Date(data.scheduledAt) : null;
   const status = scheduledDate && scheduledDate.getTime() > Date.now() ? GameStatus.SCHEDULED : GameStatus.IN_PROGRESS;
 
-  const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
-  const normalizedHomeNames = data.homeLineupNames.map(normalizeName);
-  const normalizedAwayNames = data.awayLineupNames.map(normalizeName);
+  const normalizedHomeNames = data.homeLineupNames.map(normalizePlayerName);
+  const normalizedAwayNames = data.awayLineupNames.map(normalizePlayerName);
 
   if (data.type === GameType.EXHIBITION) {
     if (
@@ -119,7 +116,7 @@ export async function POST(req: Request) {
         const playerByName = new Map<string, string>();
         const playerByAlias = new Map(existingAliases.map((alias) => [alias.aliasKey, alias.playerId]));
         for (const player of existingPlayers) {
-          const key = normalizeName(player.name).toLocaleLowerCase();
+          const key = normalizePlayerName(player.name).toLocaleLowerCase();
           if (!playerByName.has(key)) playerByName.set(key, player.id);
         }
         const resolvePlayerIds = async (names: string[]) => {
@@ -143,8 +140,8 @@ export async function POST(req: Request) {
           throw new GameSetupError('Every shooter must appear only once. Check for alternate names of the same player.');
         }
 
-        const homeName = normalizeName(data.homeTeamName ?? '') || 'Exhibition Home';
-        const awayName = normalizeName(data.awayTeamName ?? '') || 'Exhibition Away';
+        const homeName = normalizePlayerName(data.homeTeamName ?? '') || 'Exhibition Home';
+        const awayName = normalizePlayerName(data.awayTeamName ?? '') || 'Exhibition Away';
 
         if (homeName.toLowerCase() === awayName.toLowerCase()) {
           throw new GameSetupError('Home and away teams must differ.');

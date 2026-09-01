@@ -2,6 +2,7 @@ import { authOptions } from '@/lib/auth';
 import { logAdminAudit } from '@/lib/admin-audit';
 import { canonicalizeEmail, normalizeEmail } from '@/lib/email';
 import { parseWorkbook } from '@/lib/excel';
+import { normalizePlayerKey } from '@/lib/player-name';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
@@ -16,9 +17,6 @@ const MAX_WORKBOOK_BYTES = 10 * 1024 * 1024;
 const workbookEmailSchema = z.string().email().max(254);
 
 class ImportValidationError extends Error {}
-
-const normalizePlayerKey = (value: string) =>
-  value.replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' ').toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);

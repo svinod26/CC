@@ -9,6 +9,8 @@ export function formatGameDuration(startedAt: DateValue, endedAt: DateValue | nu
   const startedAtMs = toTimestamp(startedAt);
   const endedAtMs = toTimestamp(endedAt);
   const durationMs = endedAtMs - startedAtMs;
+
+  // added because if a game is longer than 5 hours its gotta be a mistake no one is that bad lol
   if (
     !Number.isFinite(startedAtMs) ||
     !Number.isFinite(endedAtMs) ||
