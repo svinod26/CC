@@ -253,8 +253,8 @@ export function AdminRosterManager({
   return (
     <section className="min-w-0 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       <div>
-        <p className="text-xs uppercase tracking-wide text-garnet-600">Roster</p>
-        <h2 className="text-lg font-semibold text-ink">Add player</h2>
+        <p className="text-xs uppercase tracking-wide text-garnet-600">Roster Management</p>
+        <h2 className="text-lg font-semibold text-ink">Add player to Site</h2>
         <p className="text-xs text-ash">
           {latestSeason?.teams.length
             ? `Creates or reuses a Player and adds them to the latest season, ${latestSeason.name}.`

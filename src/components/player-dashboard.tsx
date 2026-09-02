@@ -6,6 +6,8 @@ import { advancedStats, baseRatingStats, boxScore, defaultMultipliers, isMake } 
 import { PlayerLink } from '@/components/player-link';
 import { SeasonSelect } from '@/components/season-select';
 import { GameTypeSelect } from '@/components/game-type-select';
+import { sortPlayerGamesBySeasonAndWeek } from '@/lib/player-game-order';
+import type { SeasonLike } from '@/lib/season';
 
 type LeagueAgg = {
   games: number;
@@ -20,10 +22,8 @@ type LeagueAgg = {
 type PlayerGameRow = {
   id: string;
   weekLabel: string;
-  weekNumber: number | null;
   matchup: string;
   date: string;
-  startedAtMs: number;
   makes: number;
   attempts: number;
   tops: number;
@@ -50,7 +50,7 @@ export async function PlayerDashboard({
   playerId: string;
   seasonId?: string | null;
   gameType?: GameType | null;
-  seasonOptions?: { id: string; name: string }[];
+  seasonOptions?: SeasonLike[];
   seasonValue?: string;
   typeValue?: string;
 }) {
@@ -67,7 +67,7 @@ export async function PlayerDashboard({
           { legacyStats: { some: { playerId: player.id } } }
         ]
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
       include: {
         homeTeam: true,
         awayTeam: true,
@@ -92,6 +92,8 @@ export async function PlayerDashboard({
     })
   ]);
 
+  const orderedGames =
+    seasonValue === 'all' ? sortPlayerGamesBySeasonAndWeek(games, seasonOptions ?? []) : games;
   const trackedEvents = games.flatMap((game) => game.events);
   const legacyStats = games.flatMap((game) => game.legacyStats);
 
@@ -136,64 +138,52 @@ export async function PlayerDashboard({
   const hasTracked = trackedAttempts > 0;
   const hasLegacy = legacyTotals.attempts > 0;
 
-  const gameRows: PlayerGameRow[] = games
-    .map((game) => {
-      const isLegacy = game.statsSource === 'LEGACY';
-      let rowMakes = 0;
-      let rowAttempts = 0;
-      let tops = 0;
-      let bottoms = 0;
+  const gameRows: PlayerGameRow[] = orderedGames.map((game) => {
+    const isLegacy = game.statsSource === 'LEGACY';
+    let rowMakes = 0;
+    let rowAttempts = 0;
+    let tops = 0;
+    let bottoms = 0;
 
-      if (isLegacy) {
-        const legacy = game.legacyStats[0];
-        if (legacy) {
-          const breakdown = legacy.topRegular + legacy.topIso + legacy.bottomRegular + legacy.bottomIso;
-          rowMakes = legacy.totalCups > 0 ? legacy.totalCups : breakdown;
-          rowAttempts = rowMakes + legacy.misses;
-          tops = legacy.topRegular + legacy.topIso;
-          bottoms = legacy.bottomRegular + legacy.bottomIso;
-        }
-      } else {
-        for (const event of game.events) {
-          rowAttempts += 1;
-          if (isMake(event.resultType)) {
-            rowMakes += 1;
-            if (event.resultType === ResultType.TOP_REGULAR || event.resultType === ResultType.TOP_ISO) tops += 1;
-            if (event.resultType === ResultType.BOTTOM_REGULAR || event.resultType === ResultType.BOTTOM_ISO) bottoms += 1;
-          }
+    if (isLegacy) {
+      const legacy = game.legacyStats[0];
+      if (legacy) {
+        const breakdown = legacy.topRegular + legacy.topIso + legacy.bottomRegular + legacy.bottomIso;
+        rowMakes = legacy.totalCups > 0 ? legacy.totalCups : breakdown;
+        rowAttempts = rowMakes + legacy.misses;
+        tops = legacy.topRegular + legacy.topIso;
+        bottoms = legacy.bottomRegular + legacy.bottomIso;
+      }
+    } else {
+      for (const event of game.events) {
+        rowAttempts += 1;
+        if (isMake(event.resultType)) {
+          rowMakes += 1;
+          if (event.resultType === ResultType.TOP_REGULAR || event.resultType === ResultType.TOP_ISO) tops += 1;
+          if (event.resultType === ResultType.BOTTOM_REGULAR || event.resultType === ResultType.BOTTOM_ISO) bottoms += 1;
         }
       }
+    }
 
-      const fg = rowAttempts ? rowMakes / rowAttempts : 0;
-      const weekNumber = game.scheduleEntry?.week ?? null;
-      const weekLabel = weekNumber ? `Week ${weekNumber}` : '—';
-      const matchup = `${game.homeTeam?.name ?? 'Home'} vs ${game.awayTeam?.name ?? 'Away'}`;
-      const date = game.startedAt?.toLocaleDateString?.() ?? '';
-      const startedAtMs = game.startedAt?.getTime?.() ?? 0;
+    const fg = rowAttempts ? rowMakes / rowAttempts : 0;
+    const weekNumber = game.scheduleEntry?.week ?? null;
+    const weekLabel = weekNumber ? `Week ${weekNumber}` : '—';
+    const matchup = `${game.homeTeam?.name ?? 'Home'} vs ${game.awayTeam?.name ?? 'Away'}`;
+    const date = game.startedAt?.toLocaleDateString?.() ?? '';
 
-      return {
-        id: game.id,
-        weekLabel,
-        weekNumber,
-        matchup,
-        date,
-        startedAtMs,
-        makes: rowMakes,
-        attempts: rowAttempts,
-        tops,
-        bottoms,
-        fg,
-        isLegacy
-      };
-    })
-    .sort((a, b) => {
-      if (a.weekNumber !== b.weekNumber) {
-        if (a.weekNumber === null) return 1;
-        if (b.weekNumber === null) return -1;
-        return b.weekNumber - a.weekNumber;
-      }
-      return b.startedAtMs - a.startedAtMs;
-    });
+    return {
+      id: game.id,
+      weekLabel,
+      matchup,
+      date,
+      makes: rowMakes,
+      attempts: rowAttempts,
+      tops,
+      bottoms,
+      fg,
+      isLegacy
+    };
+  });
 
   const gamesPlayed = gameRows.length;
   const avgMakes = gamesPlayed ? gameRows.reduce((sum, row) => sum + row.makes, 0) / gamesPlayed : 0;

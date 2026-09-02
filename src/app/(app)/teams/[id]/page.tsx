@@ -58,7 +58,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
   const gamesRaw = await prisma.game.findMany({
     where: { OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] },
-    orderBy: { startedAt: 'desc' },
+    orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
     include: {
       homeTeam: true,
       awayTeam: true,
@@ -69,12 +69,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       legacyTeamStats: true
     }
   });
-  const games = [...gamesRaw].sort((a, b) => {
-    const weekA = a.scheduleEntry?.week ?? -1;
-    const weekB = b.scheduleEntry?.week ?? -1;
-    if (weekA !== weekB) return weekB - weekA;
-    return b.startedAt.getTime() - a.startedAt.getTime();
-  });
+  const games = gamesRaw;
 
   const pullEvents = await prisma.shotEvent.findMany({
     where: {

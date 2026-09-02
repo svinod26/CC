@@ -56,18 +56,13 @@ export default async function HomePage() {
         { legacyStats: { some: {} } }
       ]
     },
-    take: 24,
+    orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    take: 6,
     include: {
       homeTeam: true,
       awayTeam: true,
       state: true,
-      scheduleEntry: true,
-      events: {
-        where: { resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] } },
-        orderBy: { timestamp: 'desc' },
-        take: 1,
-        select: { timestamp: true }
-      }
+      scheduleEntry: true
     }
   });
   const inProgressPromise = prisma.game.findMany({
@@ -87,16 +82,7 @@ export default async function HomePage() {
     latestWeekPromise,
     inProgressPromise
   ]);
-  const recentGames = recentLeagueGamesRaw
-    .sort((a, b) => {
-      const weekA = a.scheduleEntry?.week ?? -1;
-      const weekB = b.scheduleEntry?.week ?? -1;
-      if (weekA !== weekB) return weekB - weekA;
-      const activityA = a.events[0]?.timestamp?.getTime?.() ?? a.startedAt.getTime();
-      const activityB = b.events[0]?.timestamp?.getTime?.() ?? b.startedAt.getTime();
-      return activityB - activityA;
-    })
-    .slice(0, 6);
+  const recentGames = recentLeagueGamesRaw;
 
   const latestWeek = latestWeekEntry?.week ?? null;
   const latestWeekGames = latestWeek
@@ -131,8 +117,8 @@ export default async function HomePage() {
           ],
           seasonId: currentSeason.id
         },
-        orderBy: { startedAt: 'desc' },
-        take: 20,
+        orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        take: 5,
         include: {
           homeTeam: true,
           awayTeam: true,
@@ -142,14 +128,7 @@ export default async function HomePage() {
         }
       })
     : [];
-  const recentPlayerGames = [...recentPlayerGamesRaw]
-    .sort((a, b) => {
-      const weekA = a.scheduleEntry?.week ?? -1;
-      const weekB = b.scheduleEntry?.week ?? -1;
-      if (weekA !== weekB) return weekB - weekA;
-      return b.startedAt.getTime() - a.startedAt.getTime();
-    })
-    .slice(0, 5);
+  const recentPlayerGames = recentPlayerGamesRaw;
 
   const adjustedWeightFor = (resultType: ResultType) => {
     if (resultType === ResultType.TOP_REGULAR) return defaultMultipliers.top;
