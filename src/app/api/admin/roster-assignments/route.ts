@@ -4,14 +4,14 @@ import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import {
   AdminRosterError,
+  adminRosterAssignmentConfirmationSchema,
   adminRosterAssignmentRequestSchema,
-  adminRosterConfirmationSchema,
   updateAdminRosterAssignment
 } from '@/lib/admin-roster';
 
 const commitSchema = adminRosterAssignmentRequestSchema.extend({
   fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-  confirmations: z.array(adminRosterConfirmationSchema).max(4).default([])
+  confirmations: z.array(adminRosterAssignmentConfirmationSchema).max(1).default([])
 }).strict();
 
 export async function POST(req: Request) {

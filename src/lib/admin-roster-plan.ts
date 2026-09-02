@@ -1,5 +1,4 @@
 export type AdminRosterConfirmation =
-  | 'REUSE_DIFFERENT_NAME'
   | 'LINK_EXISTING_USER'
   | 'MOVE_TEAM'
   | 'UNASSIGN_PLAYER';
@@ -14,13 +13,10 @@ export type AdminRosterAction =
 export type AdminRosterPlanPlayer = {
   id: string;
   name: string;
-  email: string | null;
-  normalizedEmail: string | null;
   canonicalEmail: string | null;
   nameKey: string;
   identityKey: string;
   aliasKeys: string[];
-  updatedAt: string;
 };
 
 export type AdminRosterPlanUser = {
@@ -144,25 +140,19 @@ export function planAdminRosterAssignment({
 export function planAdminRosterAddition({
   players,
   users,
-  memberships,
-  teamId,
   submittedName,
   submittedNameKey,
   submittedAliasKey,
   submittedEmail,
-  submittedCanonicalEmail,
-  openLeagueGamePlayerIds = []
+  submittedCanonicalEmail
 }: {
   players: AdminRosterPlanPlayer[];
   users: AdminRosterPlanUser[];
-  memberships: AdminRosterPlanMembership[];
-  teamId: string;
   submittedName: string;
   submittedNameKey: string;
   submittedAliasKey: string;
   submittedEmail: string;
   submittedCanonicalEmail: string;
-  openLeagueGamePlayerIds?: string[];
 }) {
   const emailPlayers = players.filter(
     (player) => player.canonicalEmail === submittedCanonicalEmail
@@ -206,89 +196,34 @@ export function planAdminRosterAddition({
     );
   }
 
-  const player = emailPlayer ?? nameOrAliasPlayer;
-  if (
-    player?.canonicalEmail &&
-    player.canonicalEmail !== submittedCanonicalEmail
-  ) {
+  const existingPlayer = emailPlayer ?? nameOrAliasPlayer;
+  if (existingPlayer) {
     throw new AdminRosterPlanError(
       'CONFLICT',
-      `${player.name} already has a different email. Use Email management to review or correct it first.`
+      `“${existingPlayer.name}” already exists as a Player. Use “Move, assign, or unassign existing player” for team changes, or Email management below for email corrections.`
     );
   }
 
   const linkedUser = emailUsers[0] ?? null;
-  const matchedBySubmittedName = Boolean(
-    player &&
-      (namePlayers.some((candidate) => candidate.id === player.id) ||
-        aliasPlayers.some((candidate) => candidate.id === player.id))
-  );
-  const existingMemberships = player
-    ? memberships.filter((membership) => membership.playerId === player.id)
-    : [];
-  const assignmentPlan = planAdminRosterAssignment({
-    playerId: player?.id ?? '__new_player__',
-    playerName: player?.name ?? submittedName,
-    memberships: existingMemberships,
-    destinationTeamId: teamId,
-    hasOpenLeagueGame: Boolean(
-      player && openLeagueGamePlayerIds.includes(player.id)
-    )
-  });
-  const selectedMembership = assignmentPlan.destinationMembership;
-  const otherMemberships = existingMemberships.filter(
-    (membership) => membership.teamId !== teamId
-  );
-
-  const playerWillBeCreated = !player;
-  const playerEmailWillBeAssigned = Boolean(
-    player && !player.email && assignmentPlan.changed
-  );
-  const resolvedEmail = player?.email
-    ? player.normalizedEmail!
-    : linkedUser?.normalizedEmail ?? submittedEmail;
+  const resolvedEmail = linkedUser?.normalizedEmail ?? submittedEmail;
   const requiredConfirmations: AdminRosterConfirmation[] = [];
   const warnings: Array<{ code: AdminRosterConfirmation; message: string }> = [];
 
-  if (assignmentPlan.changed && player && !matchedBySubmittedName) {
-    requiredConfirmations.push('REUSE_DIFFERENT_NAME');
-    warnings.push({
-      code: 'REUSE_DIFFERENT_NAME',
-      message: `The email belongs to the existing Player “${player.name}”. The submitted name “${submittedName}” will not replace the existing name.`
-    });
-  }
-
-  const userIsAlreadyLinkedToPlayer = Boolean(
-    player?.canonicalEmail && player.canonicalEmail === linkedUser?.canonicalEmail
-  );
-  if (assignmentPlan.changed && linkedUser && !userIsAlreadyLinkedToPlayer) {
+  if (linkedUser) {
     requiredConfirmations.push('LINK_EXISTING_USER');
     warnings.push({
       code: 'LINK_EXISTING_USER',
-      message: `This email already belongs to the registered account “${linkedUser.name ?? linkedUser.email}”. Creating or updating the Player email will link it to that account.`
+      message: `This email already belongs to the registered account “${linkedUser.name ?? linkedUser.email}”. Creating the Player with this email will link it to that account.`
     });
   }
 
-  requiredConfirmations.push(...assignmentPlan.requiredConfirmations);
-  warnings.push(...assignmentPlan.warnings);
-
   return {
-    action: playerWillBeCreated ? 'CREATE_PLAYER' as const : assignmentPlan.action,
-    playerId: player?.id ?? null,
-    playerName: player?.name ?? submittedName,
-    currentPlayerEmail: player?.normalizedEmail ?? null,
+    action: 'CREATE_PLAYER' as const,
+    playerName: submittedName,
     resolvedEmail,
-    playerUpdatedAt: player?.updatedAt ?? null,
-    playerWillBeCreated,
-    playerEmailWillBeAssigned,
     linkedUserId: linkedUser?.id ?? null,
     linkedUserName: linkedUser?.name ?? null,
-    selectedMembershipId: selectedMembership?.id ?? null,
-    activeMembership: assignmentPlan.activeMembership,
-    destinationMembership: assignmentPlan.destinationMembership,
-    existingMemberships,
-    otherMemberships,
-    changed: playerWillBeCreated || assignmentPlan.changed,
+    changed: true,
     requiredConfirmations,
     warnings
   };

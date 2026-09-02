@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   AdminRosterPlanError,
@@ -18,13 +19,10 @@ const aliasKey = (value) => nameKey(value).replace(/[^a-z0-9]/g, '');
 const player = ({ id, name, email = null, aliases = [] }) => ({
   id,
   name,
-  email,
-  normalizedEmail: email ? normalizeEmail(email) : null,
   canonicalEmail: email ? canonicalizeEmail(email) : null,
   nameKey: nameKey(name),
   identityKey: aliasKey(name),
-  aliasKeys: aliases.map(aliasKey),
-  updatedAt: '2026-08-31T12:00:00.000Z'
+  aliasKeys: aliases.map(aliasKey)
 });
 const user = ({ id, name, email }) => ({
   id,
@@ -43,16 +41,12 @@ const membership = ({ id, playerId, teamId, teamName, isActive = true }) => ({
 const plan = ({
   players = [],
   users = [],
-  memberships = [],
-  teamId = 'team-sea',
   name = 'New Player',
   email = 'new.player@example.com'
 } = {}) =>
   planAdminRosterAddition({
     players,
     users,
-    memberships,
-    teamId,
     submittedName: name,
     submittedNameKey: nameKey(name),
     submittedAliasKey: aliasKey(name),
@@ -66,51 +60,46 @@ const expectCode = (code, callback) => {
 
 test('plans one new Player with the mandatory submitted email', () => {
   const result = plan();
-  assert.equal(result.playerWillBeCreated, true);
+  assert.equal(result.action, 'CREATE_PLAYER');
   assert.equal(result.playerName, 'New Player');
   assert.equal(result.resolvedEmail, 'new.player@example.com');
   assert.equal(result.changed, true);
   assert.deepEqual(result.requiredConfirmations, []);
 });
 
-test('reuses an existing Player matched by the same name and email', () => {
+test('new-player flow rejects an existing Player matched by the same name and email', () => {
   const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
-  const result = plan({ players: [existing], name: 'Returning Player', email: 'returning@example.com' });
-  assert.equal(result.playerId, 'player-1');
-  assert.equal(result.playerWillBeCreated, false);
-  assert.equal(result.playerEmailWillBeAssigned, false);
-  assert.deepEqual(result.requiredConfirmations, []);
+  expectCode('CONFLICT', () =>
+    plan({ players: [existing], name: 'Returning Player', email: 'returning@example.com' })
+  );
 });
 
-test('reuses a name-matched Player with no email and assigns the submitted email', () => {
+test('new-player flow rejects a name-matched Player with no email', () => {
   const existing = player({ id: 'player-1', name: 'Returning Player' });
-  const result = plan({ players: [existing], name: 'Returning Player', email: 'returning@example.com' });
-  assert.equal(result.playerId, 'player-1');
-  assert.equal(result.playerEmailWillBeAssigned, true);
-  assert.equal(result.resolvedEmail, 'returning@example.com');
+  expectCode('CONFLICT', () =>
+    plan({ players: [existing], name: 'Returning Player', email: 'returning@example.com' })
+  );
 });
 
-test('reuses a Player through an explicit alias while preserving the canonical name', () => {
+test('new-player flow rejects an existing Player matched through an explicit alias', () => {
   const existing = player({ id: 'player-1', name: 'William He', email: 'will@example.com', aliases: ['Will He'] });
-  const result = plan({ players: [existing], name: 'Will He', email: 'will@example.com' });
-  assert.equal(result.playerId, 'player-1');
-  assert.equal(result.playerName, 'William He');
-  assert.deepEqual(result.requiredConfirmations, []);
+  expectCode('CONFLICT', () =>
+    plan({ players: [existing], name: 'Will He', email: 'will@example.com' })
+  );
 });
 
-test('reuses a punctuation-equivalent canonical Player name', () => {
+test('new-player flow rejects a punctuation-equivalent Player name', () => {
   const existing = player({ id: 'player-1', name: "O'Wen Danganan", email: 'owen@example.com' });
-  const result = plan({ players: [existing], name: 'Owen-Danganan', email: 'owen@example.com' });
-  assert.equal(result.playerId, 'player-1');
-  assert.equal(result.playerName, "O'Wen Danganan");
-  assert.deepEqual(result.requiredConfirmations, ['REUSE_DIFFERENT_NAME']);
+  expectCode('CONFLICT', () =>
+    plan({ players: [existing], name: 'Owen-Danganan', email: 'owen@example.com' })
+  );
 });
 
-test('requires confirmation when only the email matches a differently named Player', () => {
+test('new-player flow rejects an existing Player matched only by email', () => {
   const existing = player({ id: 'player-1', name: 'Canonical Name', email: 'same@example.com' });
-  const result = plan({ players: [existing], name: 'Different Name', email: 'same@example.com' });
-  assert.deepEqual(result.requiredConfirmations, ['REUSE_DIFFERENT_NAME']);
-  assert.equal(result.playerName, 'Canonical Name');
+  expectCode('CONFLICT', () =>
+    plan({ players: [existing], name: 'Different Name', email: 'same@example.com' })
+  );
 });
 
 test('rejects changing an existing non-null Player email through roster management', () => {
@@ -157,53 +146,27 @@ test('requires confirmation before linking a new Player to a standalone User', (
   assert.deepEqual(result.requiredConfirmations, ['LINK_EXISTING_USER']);
 });
 
-test('does not request a linking confirmation for an already linked Player and User', () => {
+test('new-player flow rejects an existing Player even when a User has the same email', () => {
   const existingPlayer = player({ id: 'player-1', name: 'Registered Player', email: 'linked@example.com' });
-  const result = plan({
-    players: [existingPlayer],
-    users: [user({ id: 'user-1', name: 'Registered Player', email: 'linked@example.com' })],
-    name: 'Registered Player',
-    email: 'linked@example.com'
-  });
-  assert.equal(result.linkedUserId, 'user-1');
-  assert.deepEqual(result.requiredConfirmations, []);
+  expectCode('CONFLICT', () =>
+    plan({
+      players: [existingPlayer],
+      users: [user({ id: 'user-1', name: 'Registered Player', email: 'linked@example.com' })],
+      name: 'Registered Player',
+      email: 'linked@example.com'
+    })
+  );
 });
 
-test('requires confirmation before moving an existing Player to another team', () => {
-  const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
-  const result = plan({
-    players: [existing],
-    memberships: [membership({ id: 'roster-1', playerId: 'player-1', teamId: 'team-e', teamName: 'E' })],
-    name: 'Returning Player',
-    email: 'returning@example.com'
-  });
-  assert.equal(result.changed, true);
-  assert.equal(result.action, 'MOVE_PLAYER');
-  assert.deepEqual(result.requiredConfirmations, ['MOVE_TEAM']);
-});
-
-test('returns an idempotent no-op when the Player is already on the selected team', () => {
-  const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
-  const result = plan({
-    players: [existing],
-    memberships: [membership({ id: 'roster-1', playerId: 'player-1', teamId: 'team-sea', teamName: 'Sea' })],
-    name: 'Returning Player',
-    email: 'returning@example.com'
-  });
-  assert.equal(result.changed, false);
-  assert.equal(result.selectedMembershipId, 'roster-1');
-  assert.deepEqual(result.requiredConfirmations, []);
-});
-
-test('reactivates an inactive historical membership without creating a second logical membership', () => {
-  const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
-  const result = plan({
-    players: [existing],
+test('existing-player assignment reactivates an inactive historical membership', () => {
+  const result = planAdminRosterAssignment({
+    playerId: 'player-1',
+    playerName: 'Returning Player',
     memberships: [
       membership({ id: 'roster-old', playerId: 'player-1', teamId: 'team-sea', teamName: 'Sea', isActive: false })
     ],
-    name: 'Returning Player',
-    email: 'returning@example.com'
+    destinationTeamId: 'team-sea',
+    hasOpenLeagueGame: false
   });
   assert.equal(result.action, 'ASSIGN_PLAYER');
   assert.equal(result.destinationMembership.id, 'roster-old');
@@ -227,16 +190,16 @@ test('moves back to a former team by reactivating its existing membership', () =
 });
 
 test('rejects multiple active memberships instead of guessing which one to change', () => {
-  const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
   expectCode('CONFLICT', () =>
-    plan({
-      players: [existing],
+    planAdminRosterAssignment({
+      playerId: 'player-1',
+      playerName: 'Returning Player',
       memberships: [
         membership({ id: 'roster-1', playerId: 'player-1', teamId: 'team-e', teamName: 'E' }),
         membership({ id: 'roster-2', playerId: 'player-1', teamId: 'team-f', teamName: 'F' })
       ],
-      name: 'Returning Player',
-      email: 'returning@example.com'
+      destinationTeamId: 'team-sea',
+      hasOpenLeagueGame: false
     })
   );
 });
@@ -288,4 +251,18 @@ test('rejects multiple normalized name matches instead of choosing one', () => {
       email: 'unique@example.com'
     })
   );
+});
+
+test('new-player commit path can only create a Player and initial roster membership', async () => {
+  const source = await readFile(new URL('../src/lib/admin-roster.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('export async function addAdminRosterPlayer');
+  const end = source.indexOf('export async function updateAdminRosterAssignment');
+  assert.ok(start >= 0 && end > start);
+  const additionSource = source.slice(start, end);
+
+  assert.match(additionSource, /await tx\.player\.create\(/);
+  assert.match(additionSource, /await tx\.teamRoster\.create\(/);
+  assert.doesNotMatch(additionSource, /tx\.player\.(?:update|upsert|delete)/);
+  assert.doesNotMatch(additionSource, /applyActiveRosterChange/);
+  assert.doesNotMatch(additionSource, /MOVE_PLAYER|ASSIGN_PLAYER|emailWillBeAssigned/);
 });

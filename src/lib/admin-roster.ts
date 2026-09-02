@@ -28,9 +28,8 @@ export const adminRosterRequestSchema = z
 
 export type AdminRosterRequest = z.infer<typeof adminRosterRequestSchema>;
 
-export const adminRosterConfirmationSchema = z.enum([
-  'REUSE_DIFFERENT_NAME',
-  'LINK_EXISTING_USER',
+export const adminRosterAdditionConfirmationSchema = z.literal('LINK_EXISTING_USER');
+export const adminRosterAssignmentConfirmationSchema = z.enum([
   'MOVE_TEAM',
   'UNASSIGN_PLAYER'
 ]);
@@ -70,7 +69,7 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
     );
   }
 
-  const [team, players, users, memberships, openGameLineups] = await Promise.all([
+  const [team, players, users] = await Promise.all([
     db.team.findUnique({
       where: { id: request.teamId },
       select: { id: true, name: true, seasonId: true }
@@ -80,33 +79,11 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
         id: true,
         name: true,
         email: true,
-        updatedAt: true,
         aliases: { select: { aliasKey: true } }
       }
     }),
     db.user.findMany({
       select: { id: true, name: true, email: true }
-    }),
-    db.teamRoster.findMany({
-      where: { seasonId: latestSeason.id },
-      select: {
-        id: true,
-        playerId: true,
-        teamId: true,
-        isActive: true,
-        team: { select: { name: true } }
-      },
-      orderBy: { id: 'asc' }
-    }),
-    db.gameLineup.findMany({
-      where: {
-        game: {
-          seasonId: latestSeason.id,
-          type: 'LEAGUE',
-          status: { in: ['SCHEDULED', 'IN_PROGRESS'] }
-        }
-      },
-      select: { playerId: true }
     })
   ]);
 
@@ -129,13 +106,10 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
       players: players.map((player) => ({
         id: player.id,
         name: player.name,
-        email: player.email,
-        normalizedEmail: player.email ? normalizeEmail(player.email) : null,
         canonicalEmail: player.email ? canonicalizeEmail(player.email) : null,
         nameKey: normalizePlayerNameKey(player.name),
         identityKey: normalizePlayerKey(player.name),
-        aliasKeys: player.aliases.map((alias) => alias.aliasKey),
-        updatedAt: player.updatedAt.toISOString()
+        aliasKeys: player.aliases.map((alias) => alias.aliasKey)
       })),
       users: users.map((user) => ({
         id: user.id,
@@ -144,20 +118,11 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
         normalizedEmail: normalizeEmail(user.email),
         canonicalEmail: canonicalizeEmail(user.email)
       })),
-      memberships: memberships.map((membership) => ({
-        id: membership.id,
-        playerId: membership.playerId,
-        teamId: membership.teamId ?? '',
-        teamName: membership.team?.name ?? 'Unknown team',
-        isActive: membership.isActive
-      })),
-      teamId: team.id,
       submittedName,
       submittedNameKey: normalizePlayerNameKey(submittedName),
       submittedAliasKey: normalizePlayerKey(submittedName),
       submittedEmail,
-      submittedCanonicalEmail: canonicalizeEmail(submittedEmail),
-      openLeagueGamePlayerIds: openGameLineups.map((lineup) => lineup.playerId)
+      submittedCanonicalEmail: canonicalizeEmail(submittedEmail)
     });
   } catch (error) {
     if (error instanceof AdminRosterPlanError) {
@@ -171,25 +136,11 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
     season: latestSeason,
     team,
     player: {
-      id: identityPlan.playerId,
       name: identityPlan.playerName,
-      currentEmail: identityPlan.currentPlayerEmail,
-      resolvedEmail: identityPlan.resolvedEmail,
-      updatedAt: identityPlan.playerUpdatedAt
+      email: identityPlan.resolvedEmail
     },
     linkedUserId: identityPlan.linkedUserId,
     action: identityPlan.action,
-    selectedMembershipId: identityPlan.selectedMembershipId,
-    activeMembershipId: identityPlan.activeMembership?.id ?? null,
-    destinationMembershipId: identityPlan.destinationMembership?.id ?? null,
-    memberships: identityPlan.existingMemberships
-      .map((membership) => ({
-        id: membership.id,
-        teamId: membership.teamId,
-        teamName: membership.teamName,
-        isActive: membership.isActive
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id)),
     requiredConfirmations: [...identityPlan.requiredConfirmations].sort()
   };
   const fingerprint = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
@@ -201,12 +152,8 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
     team: { id: team.id, name: team.name },
     action: identityPlan.action,
     player: {
-      id: identityPlan.playerId,
       name: identityPlan.playerName,
-      currentEmail: identityPlan.currentPlayerEmail,
-      email: identityPlan.resolvedEmail,
-      willCreate: identityPlan.playerWillBeCreated,
-      emailWillBeAssigned: identityPlan.playerEmailWillBeAssigned
+      email: identityPlan.resolvedEmail
     },
     linkedUser: identityPlan.linkedUserId
       ? {
@@ -214,15 +161,7 @@ async function buildAdminRosterPlan(db: RosterDb, request: AdminRosterRequest) {
           name: identityPlan.linkedUserName
         }
       : null,
-    existingSeasonTeams: identityPlan.existingMemberships.map((membership) => ({
-      id: membership.teamId,
-      name: membership.teamName,
-      isActive: membership.isActive
-    })),
-    activeMembershipId: identityPlan.activeMembership?.id ?? null,
-    destinationMembershipId: identityPlan.destinationMembership?.id ?? null,
-    alreadyRostered: Boolean(identityPlan.selectedMembershipId),
-    changed: identityPlan.changed,
+    changed: true,
     requiredConfirmations: identityPlan.requiredConfirmations,
     warnings: identityPlan.warnings
   };
@@ -485,7 +424,7 @@ export async function addAdminRosterPlayer({
           if (plan.fingerprint !== fingerprint) {
             throw new AdminRosterError(
               'STALE',
-              'The player, team, or roster changed after the preview. Review the refreshed preview before confirming.',
+              'The player identities, team, or latest season changed after the preview. Review the refreshed preview before confirming.',
               409
             );
           }
@@ -502,66 +441,30 @@ export async function addAdminRosterPlayer({
             );
           }
 
-          if (!plan.changed) {
-            return {
-              changed: false,
-              action: plan.action,
-              playerCreated: false,
-              playerId: plan.player.id!,
-              playerName: plan.player.name,
-              email: plan.player.currentEmail,
-              seasonId: plan.season.id,
-              seasonName: plan.season.name,
-              teamId: plan.team.id,
-              teamName: plan.team.name,
-              rosterId: null
-            };
-          }
-
-          const player = plan.player.willCreate
-            ? await tx.player.create({
-                data: { name: plan.request.name, email: plan.player.email },
-                select: { id: true, name: true, email: true }
-              })
-            : plan.player.emailWillBeAssigned
-              ? await tx.player.update({
-                  where: { id: plan.player.id! },
-                  data: { email: plan.player.email },
-                  select: { id: true, name: true, email: true }
-                })
-              : await tx.player.findUniqueOrThrow({
-                  where: { id: plan.player.id! },
-                  select: { id: true, name: true, email: true }
-                });
-
-          const roster = await applyActiveRosterChange(tx, {
-            seasonId: plan.season.id,
-            playerId: player.id,
-            destinationTeamId: plan.team.id,
-            activeMembershipId: plan.activeMembershipId,
-            destinationMembershipId: plan.destinationMembershipId
+          const player = await tx.player.create({
+            data: { name: plan.request.name, email: plan.player.email },
+            select: { id: true, name: true, email: true }
           });
-          if (!roster) {
-            throw new AdminRosterError(
-              'CONFLICT',
-              'A destination roster could not be activated. No changes were made.',
-              409
-            );
-          }
+          const roster = await tx.teamRoster.create({
+            data: {
+              seasonId: plan.season.id,
+              teamId: plan.team.id,
+              playerId: player.id,
+              isActive: true
+            },
+            select: { id: true }
+          });
 
           await tx.adminAuditLog.create({
             data: {
               actorUserId,
               gameId: null,
-              action:
-                plan.action === 'MOVE_PLAYER'
-                  ? 'ROSTER_PLAYER_MOVE'
-                  : 'ROSTER_PLAYER_ASSIGN',
+              action: 'ROSTER_PLAYER_ASSIGN',
               entityType: 'TeamRoster',
               entityId: roster.id,
               details: {
-                playerCreated: plan.player.willCreate,
-                playerEmailAssigned: plan.player.emailWillBeAssigned,
+                playerCreated: true,
+                playerEmailAssigned: false,
                 playerId: player.id,
                 playerName: player.name,
                 playerEmail: player.email,
@@ -570,10 +473,10 @@ export async function addAdminRosterPlayer({
                 teamId: plan.team.id,
                 teamName: plan.team.name,
                 linkedUserId: plan.linkedUser?.id ?? null,
-                existingSeasonTeams: plan.existingSeasonTeams,
-                rosterAction: plan.action,
-                priorActiveRosterId: plan.activeMembershipId,
-                reusedRosterId: plan.destinationMembershipId,
+                existingSeasonTeams: [],
+                rosterAction: 'CREATE_PLAYER',
+                priorActiveRosterId: null,
+                reusedRosterId: null,
                 confirmations
               }
             }
@@ -581,8 +484,8 @@ export async function addAdminRosterPlayer({
 
           return {
             changed: true,
-            action: plan.action,
-            playerCreated: plan.player.willCreate,
+            action: 'CREATE_PLAYER' as const,
+            playerCreated: true,
             playerId: player.id,
             playerName: player.name,
             email: player.email,

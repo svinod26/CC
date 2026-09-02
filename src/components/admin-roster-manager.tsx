@@ -25,17 +25,11 @@ type RosterPreview = {
   season: { id: string; name: string };
   team: { id: string; name: string };
   player: {
-    id: string | null;
     name: string;
-    currentEmail: string | null;
     email: string;
-    willCreate: boolean;
-    emailWillBeAssigned: boolean;
   };
   linkedUser: { id: string; name: string | null } | null;
-  existingSeasonTeams: Array<{ id: string; name: string; isActive: boolean }>;
-  action: 'CREATE_PLAYER' | 'ASSIGN_PLAYER' | 'MOVE_PLAYER' | 'NO_CHANGE';
-  alreadyRostered: boolean;
+  action: 'CREATE_PLAYER';
   changed: boolean;
   requiredConfirmations: AdminRosterConfirmation[];
   warnings: Array<{ code: AdminRosterConfirmation; message: string }>;
@@ -119,7 +113,7 @@ export function AdminRosterManager({
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(body?.error ?? 'Unable to preview that roster addition.');
+        setError(body?.error ?? 'Unable to preview that new player.');
         return;
       }
 
@@ -127,7 +121,7 @@ export function AdminRosterManager({
       setConfirmations([]);
       setDialogError(null);
     } catch {
-      setError('Network error. No roster changes were made.');
+      setError('Network error. No player or roster data were changed.');
     } finally {
       setIsPreviewing(false);
     }
@@ -149,26 +143,24 @@ export function AdminRosterManager({
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setDialogError(body?.error ?? 'Unable to add that roster player.');
+        setDialogError(body?.error ?? 'Unable to create that new player.');
         return;
       }
 
       const result = body.result as {
-        action: 'CREATE_PLAYER' | 'ASSIGN_PLAYER' | 'MOVE_PLAYER';
-        playerCreated: boolean;
         playerName: string;
         teamName: string;
         seasonName: string;
       };
-      const verb = result.action === 'MOVE_PLAYER' ? 'Moved' : result.playerCreated ? 'Created and assigned' : 'Assigned';
-      setMessage(`${verb} ${result.playerName} to ${result.teamName} · ${result.seasonName}.`);
+      setMessage(`Created and assigned ${result.playerName} to ${result.teamName} · ${result.seasonName}.`);
       setName('');
       setEmail('');
+      setTeamId('');
       setPreview(null);
       setConfirmations([]);
       router.refresh();
     } catch {
-      setDialogError('Network error. No roster change was confirmed.');
+      setDialogError('Network error. No new player was created.');
     } finally {
       setIsCommitting(false);
     }
@@ -254,10 +246,10 @@ export function AdminRosterManager({
     <section className="min-w-0 rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
       <div>
         <p className="text-xs uppercase tracking-wide text-garnet-600">Roster Management</p>
-        <h2 className="text-lg font-semibold text-ink">Add player to Site</h2>
+        <h2 className="text-lg font-semibold text-ink">Add new player to Site</h2>
         <p className="text-xs text-ash">
           {latestSeason?.teams.length
-            ? `Creates or reuses a Player and adds them to the latest season, ${latestSeason.name}.`
+            ? `Creates a new Player and assigns them to a team in the latest season, ${latestSeason.name}. This is only for allowing new people access to the site.`
             : latestSeason
               ? `${latestSeason.name} has no teams. Add or import its teams before adding roster players.`
               : 'Import a season before adding roster players.'}
@@ -319,7 +311,7 @@ export function AdminRosterManager({
           disabled={!canAddPlayer || isPreviewing}
           className="min-h-11 rounded-full border border-garnet-300 bg-garnet-700 px-5 py-2 text-sm font-semibold text-white hover:bg-garnet-600 disabled:opacity-50"
         >
-          {isPreviewing ? 'Checking…' : 'Review addition'}
+          {isPreviewing ? 'Checking…' : 'Review new player'}
         </button>
       </form>
 
@@ -391,22 +383,14 @@ export function AdminRosterManager({
         <DialogBackdrop className="fixed inset-0 bg-ink/45" />
         <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
           <DialogPanel className="w-full max-w-xl rounded-2xl border border-garnet-100 bg-white p-5 shadow-2xl">
-            <DialogTitle className="text-xl font-bold text-ink">Review roster addition</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-ink">Review new player</DialogTitle>
             {preview && (
               <div className="mt-4 space-y-4">
                 <div className="rounded-xl border border-garnet-100 bg-parchment/60 p-3 text-sm">
-                  <p className="font-semibold text-ink">
-                    {preview.player.willCreate ? 'Create new Player' : 'Reuse existing Player'}
-                  </p>
+                  <p className="font-semibold text-ink">Create new Player</p>
                   <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                     <dt className="text-ash">Player</dt>
                     <dd className="font-medium text-ink">{preview.player.name}</dd>
-                    {preview.player.id && (
-                      <>
-                        <dt className="text-ash">Player ID</dt>
-                        <dd className="break-all text-xs text-ink">{preview.player.id}</dd>
-                      </>
-                    )}
                     <dt className="text-ash">Email</dt>
                     <dd className="break-all font-medium text-garnet-700">{preview.player.email}</dd>
                     <dt className="text-ash">Team</dt>
@@ -416,27 +400,10 @@ export function AdminRosterManager({
                   </dl>
                 </div>
 
-                {preview.player.willCreate ? (
-                  <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-                    This creates one global Player and one roster membership. It does not create a User account; the
-                    player can request a password afterward using this email.
-                  </p>
-                ) : (
-                  <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-                    Existing stats, games, aliases, and previous roster memberships remain attached to this Player.
-                    {preview.player.emailWillBeAssigned
-                      ? ' Their currently empty Player email will be set to the displayed email.'
-                      : ' Their existing Player email will not be changed.'}
-                  </p>
-                )}
-
-                {preview.alreadyRostered && (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                    {preview.player.name} is already on {preview.team.name} for {preview.season.name}. No Player,
-                    email, User, or roster data will be changed. Use Email management separately if an email needs
-                    correction.
-                  </p>
-                )}
+                <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                  This creates one global Player and one initial roster membership. It does not create a User account;
+                  the player can request a password afterward using this email.
+                </p>
 
                 {preview.warnings.map((warning) => (
                   <label
@@ -482,7 +449,7 @@ export function AdminRosterManager({
                       disabled={!canCommit || isCommitting}
                       className="rounded-full border border-garnet-300 bg-garnet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-garnet-600 disabled:opacity-50"
                     >
-                      {isCommitting ? 'Adding…' : 'Confirm roster addition'}
+                      {isCommitting ? 'Adding…' : 'Confirm new player'}
                     </button>
                   )}
                 </div>
