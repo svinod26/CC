@@ -207,7 +207,7 @@ async function ensureRoster(seasonId, teamId, playerId) {
   if (!teamId || !playerId) return null;
   const existing = await prisma.teamRoster.findFirst({ where: { seasonId, teamId, playerId } });
   if (existing) return existing;
-  return prisma.teamRoster.create({ data: { seasonId, teamId, playerId } });
+  return prisma.teamRoster.create({ data: { seasonId, teamId, playerId, isActive: false } });
 }
 
 async function createSchedule(seasonId, week, homeTeamId, awayTeamId) {

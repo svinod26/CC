@@ -11,6 +11,14 @@ export type AdminRosterSeason = {
   teams: Array<{ id: string; name: string }>;
 };
 
+export type AdminRosterPlayer = {
+  id: string;
+  name: string;
+  email: string | null;
+  activeTeamName: string | null;
+  hasMultipleActiveTeams: boolean;
+};
+
 type RosterPreview = {
   fingerprint: string;
   request: { name: string; email: string; teamId: string };
@@ -25,14 +33,34 @@ type RosterPreview = {
     emailWillBeAssigned: boolean;
   };
   linkedUser: { id: string; name: string | null } | null;
-  existingSeasonTeams: Array<{ id: string; name: string }>;
+  existingSeasonTeams: Array<{ id: string; name: string; isActive: boolean }>;
+  action: 'CREATE_PLAYER' | 'ASSIGN_PLAYER' | 'MOVE_PLAYER' | 'NO_CHANGE';
   alreadyRostered: boolean;
   changed: boolean;
   requiredConfirmations: AdminRosterConfirmation[];
   warnings: Array<{ code: AdminRosterConfirmation; message: string }>;
 };
 
-export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRosterSeason | null }) {
+type AssignmentPreview = {
+  fingerprint: string;
+  request: { playerId: string; teamId: string | null };
+  season: { id: string; name: string };
+  player: { id: string; name: string; email: string | null };
+  currentTeam: { id: string; name: string } | null;
+  destinationTeam: { id: string; name: string } | null;
+  action: 'ASSIGN_PLAYER' | 'MOVE_PLAYER' | 'UNASSIGN_PLAYER' | 'NO_CHANGE';
+  changed: boolean;
+  requiredConfirmations: AdminRosterConfirmation[];
+  warnings: Array<{ code: AdminRosterConfirmation; message: string }>;
+};
+
+export function AdminRosterManager({
+  latestSeason,
+  players
+}: {
+  latestSeason: AdminRosterSeason | null;
+  players: AdminRosterPlayer[];
+}) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -44,6 +72,14 @@ export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRoster
   const [message, setMessage] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [assignmentPlayerId, setAssignmentPlayerId] = useState('');
+  const [assignmentTeamId, setAssignmentTeamId] = useState('');
+  const [assignmentPreview, setAssignmentPreview] = useState<AssignmentPreview | null>(null);
+  const [assignmentConfirmations, setAssignmentConfirmations] = useState<AdminRosterConfirmation[]>([]);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentDialogError, setAssignmentDialogError] = useState<string | null>(null);
+  const [isAssignmentPreviewing, setIsAssignmentPreviewing] = useState(false);
+  const [isAssignmentCommitting, setIsAssignmentCommitting] = useState(false);
   const canAddPlayer = Boolean(latestSeason && latestSeason.teams.length > 0);
 
   const canCommit = useMemo(
@@ -53,6 +89,14 @@ export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRoster
         confirmations.includes(confirmation)
       ) ?? false),
     [confirmations, preview]
+  );
+  const canCommitAssignment = useMemo(
+    () =>
+      Boolean(assignmentPreview?.changed) &&
+      (assignmentPreview?.requiredConfirmations.every((confirmation) =>
+        assignmentConfirmations.includes(confirmation)
+      ) ?? false),
+    [assignmentConfirmations, assignmentPreview]
   );
 
   const closePreview = () => {
@@ -110,14 +154,14 @@ export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRoster
       }
 
       const result = body.result as {
+        action: 'CREATE_PLAYER' | 'ASSIGN_PLAYER' | 'MOVE_PLAYER';
         playerCreated: boolean;
         playerName: string;
         teamName: string;
         seasonName: string;
       };
-      setMessage(
-        `${result.playerCreated ? 'Created' : 'Reused'} ${result.playerName} and added them to ${result.teamName} · ${result.seasonName}.`
-      );
+      const verb = result.action === 'MOVE_PLAYER' ? 'Moved' : result.playerCreated ? 'Created and assigned' : 'Assigned';
+      setMessage(`${verb} ${result.playerName} to ${result.teamName} · ${result.seasonName}.`);
       setName('');
       setEmail('');
       setPreview(null);
@@ -127,6 +171,82 @@ export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRoster
       setDialogError('Network error. No roster change was confirmed.');
     } finally {
       setIsCommitting(false);
+    }
+  };
+
+  const closeAssignmentPreview = () => {
+    if (isAssignmentCommitting) return;
+    setAssignmentPreview(null);
+    setAssignmentConfirmations([]);
+    setAssignmentDialogError(null);
+  };
+
+  const requestAssignmentPreview = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAssignmentError(null);
+    setMessage(null);
+    setIsAssignmentPreviewing(true);
+    try {
+      const response = await fetch('/api/admin/roster-assignments/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: assignmentPlayerId,
+          teamId: assignmentTeamId || null
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAssignmentError(body?.error ?? 'Unable to preview that roster assignment.');
+        return;
+      }
+      setAssignmentPreview(body.plan as AssignmentPreview);
+      setAssignmentConfirmations([]);
+      setAssignmentDialogError(null);
+    } catch {
+      setAssignmentError('Network error. No roster changes were made.');
+    } finally {
+      setIsAssignmentPreviewing(false);
+    }
+  };
+
+  const commitAssignment = async () => {
+    if (!assignmentPreview || !canCommitAssignment) return;
+    setAssignmentDialogError(null);
+    setIsAssignmentCommitting(true);
+    try {
+      const response = await fetch('/api/admin/roster-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...assignmentPreview.request,
+          fingerprint: assignmentPreview.fingerprint,
+          confirmations: assignmentConfirmations
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAssignmentDialogError(body?.error ?? 'Unable to change that roster assignment.');
+        return;
+      }
+      const result = body.result as {
+        action: AssignmentPreview['action'];
+        playerName: string;
+        teamName: string | null;
+        seasonName: string;
+      };
+      setMessage(
+        result.action === 'UNASSIGN_PLAYER'
+          ? `Unassigned ${result.playerName} from ${result.seasonName}.`
+          : `${result.action === 'MOVE_PLAYER' ? 'Moved' : 'Assigned'} ${result.playerName} to ${result.teamName} · ${result.seasonName}.`
+      );
+      setAssignmentPreview(null);
+      setAssignmentConfirmations([]);
+      router.refresh();
+    } catch {
+      setAssignmentDialogError('Network error. No roster change was confirmed.');
+    } finally {
+      setIsAssignmentCommitting(false);
     }
   };
 
@@ -208,6 +328,64 @@ export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRoster
           {error}
         </p>
       )}
+
+      <div className="mt-6 border-t border-garnet-100 pt-5">
+        <h3 className="text-base font-semibold text-ink">Move, assign, or unassign existing player</h3>
+        <p className="mt-1 text-xs text-ash">
+          Changes only the active team for {latestSeason?.name ?? 'the latest season'}. Historical memberships,
+          games, lineups, and stats are retained.
+        </p>
+        <form
+          className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end"
+          onSubmit={requestAssignmentPreview}
+        >
+          <label className="space-y-1 text-sm text-ink">
+            <span>Existing player</span>
+            <select
+              required
+              disabled={!canAddPlayer || isAssignmentPreviewing}
+              value={assignmentPlayerId}
+              onChange={(event) => setAssignmentPlayerId(event.target.value)}
+              className="min-h-11 w-full rounded-lg border border-garnet-100 bg-white px-3 py-2 disabled:opacity-60"
+            >
+              <option value="">Select player</option>
+              {players.map((player) => (
+                <option key={player.id} value={player.id} disabled={player.hasMultipleActiveTeams}>
+                  {player.name} · {player.activeTeamName ?? 'Unassigned'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-sm text-ink">
+            <span>New active team</span>
+            <select
+              disabled={!canAddPlayer || isAssignmentPreviewing}
+              value={assignmentTeamId}
+              onChange={(event) => setAssignmentTeamId(event.target.value)}
+              className="min-h-11 w-full rounded-lg border border-garnet-100 bg-white px-3 py-2 disabled:opacity-60"
+            >
+              <option value="">Unassigned</option>
+              {latestSeason?.teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={!canAddPlayer || !assignmentPlayerId || isAssignmentPreviewing}
+            className="min-h-11 rounded-full border border-garnet-300 bg-garnet-700 px-5 py-2 text-sm font-semibold text-white hover:bg-garnet-600 disabled:opacity-50"
+          >
+            {isAssignmentPreviewing ? 'Checking…' : 'Review assignment'}
+          </button>
+        </form>
+        {assignmentError && (
+          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            {assignmentError}
+          </p>
+        )}
+      </div>
 
       <Dialog open={Boolean(preview)} onClose={closePreview} className="relative z-50">
         <DialogBackdrop className="fixed inset-0 bg-ink/45" />
@@ -305,6 +483,89 @@ export function AdminRosterManager({ latestSeason }: { latestSeason: AdminRoster
                       className="rounded-full border border-garnet-300 bg-garnet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-garnet-600 disabled:opacity-50"
                     >
                       {isCommitting ? 'Adding…' : 'Confirm roster addition'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogPanel>
+        </div>
+      </Dialog>
+
+      <Dialog open={Boolean(assignmentPreview)} onClose={closeAssignmentPreview} className="relative z-50">
+        <DialogBackdrop className="fixed inset-0 bg-ink/45" />
+        <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+          <DialogPanel className="w-full max-w-xl rounded-2xl border border-garnet-100 bg-white p-5 shadow-2xl">
+            <DialogTitle className="text-xl font-bold text-ink">Review roster assignment</DialogTitle>
+            {assignmentPreview && (
+              <div className="mt-4 space-y-4">
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-xl border border-garnet-100 bg-parchment/60 p-3 text-sm">
+                  <dt className="text-ash">Player</dt>
+                  <dd className="font-medium text-ink">{assignmentPreview.player.name}</dd>
+                  <dt className="text-ash">Current team</dt>
+                  <dd className="font-medium text-ink">{assignmentPreview.currentTeam?.name ?? 'Unassigned'}</dd>
+                  <dt className="text-ash">New team</dt>
+                  <dd className="font-medium text-ink">{assignmentPreview.destinationTeam?.name ?? 'Unassigned'}</dd>
+                  <dt className="text-ash">Season</dt>
+                  <dd className="font-medium text-ink">{assignmentPreview.season.name} (latest)</dd>
+                </dl>
+
+                <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                  This changes only active roster eligibility. No Player, User, game, lineup, shot, legacy stat, or
+                  historical roster row will be deleted or reassigned.
+                </p>
+
+                {!assignmentPreview.changed && (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    This player already has the selected assignment. No data will be changed.
+                  </p>
+                )}
+
+                {assignmentPreview.warnings.map((warning) => (
+                  <label
+                    key={warning.code}
+                    className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={assignmentConfirmations.includes(warning.code)}
+                      disabled={isAssignmentCommitting}
+                      onChange={(event) =>
+                        setAssignmentConfirmations((current) =>
+                          event.target.checked
+                            ? [...current, warning.code]
+                            : current.filter((confirmation) => confirmation !== warning.code)
+                        )
+                      }
+                    />
+                    <span>{warning.message}</span>
+                  </label>
+                ))}
+
+                {assignmentDialogError && (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                    {assignmentDialogError}
+                  </p>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeAssignmentPreview}
+                    disabled={isAssignmentCommitting}
+                    className="rounded-full border border-garnet-100 px-4 py-2 text-sm font-semibold text-ash hover:bg-parchment disabled:opacity-50"
+                  >
+                    {assignmentPreview.changed ? 'Cancel' : 'Close'}
+                  </button>
+                  {assignmentPreview.changed && (
+                    <button
+                      type="button"
+                      onClick={commitAssignment}
+                      disabled={!canCommitAssignment || isAssignmentCommitting}
+                      className="rounded-full border border-garnet-300 bg-garnet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-garnet-600 disabled:opacity-50"
+                    >
+                      {isAssignmentCommitting ? 'Saving…' : 'Confirm assignment'}
                     </button>
                   )}
                 </div>

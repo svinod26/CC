@@ -56,7 +56,10 @@ export default async function TeamsPage({
     include: {
       season: true,
       conference: true,
-      rosters: { include: { player: true } }
+      rosters: {
+        ...(season?.id === orderedSeasons[0]?.id ? { where: { isActive: true } } : {}),
+        include: { player: true }
+      }
     }
   });
 

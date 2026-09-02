@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   AdminRosterPlanError,
-  planAdminRosterAddition
+  planAdminRosterAddition,
+  planAdminRosterAssignment
 } from '../src/lib/admin-roster-plan.ts';
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
@@ -32,11 +33,12 @@ const user = ({ id, name, email }) => ({
   normalizedEmail: normalizeEmail(email),
   canonicalEmail: canonicalizeEmail(email)
 });
-const membership = ({ id, playerId, teamId, teamName }) => ({
+const membership = ({ id, playerId, teamId, teamName, isActive = true }) => ({
   id,
   playerId,
   teamId,
-  teamName
+  teamName,
+  isActive
 });
 const plan = ({
   players = [],
@@ -167,7 +169,7 @@ test('does not request a linking confirmation for an already linked Player and U
   assert.deepEqual(result.requiredConfirmations, []);
 });
 
-test('requires confirmation before adding an existing Player to another team in the latest season', () => {
+test('requires confirmation before moving an existing Player to another team', () => {
   const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
   const result = plan({
     players: [existing],
@@ -176,7 +178,8 @@ test('requires confirmation before adding an existing Player to another team in 
     email: 'returning@example.com'
   });
   assert.equal(result.changed, true);
-  assert.deepEqual(result.requiredConfirmations, ['ADDITIONAL_TEAM']);
+  assert.equal(result.action, 'MOVE_PLAYER');
+  assert.deepEqual(result.requiredConfirmations, ['MOVE_TEAM']);
 });
 
 test('returns an idempotent no-op when the Player is already on the selected team', () => {
@@ -190,6 +193,88 @@ test('returns an idempotent no-op when the Player is already on the selected tea
   assert.equal(result.changed, false);
   assert.equal(result.selectedMembershipId, 'roster-1');
   assert.deepEqual(result.requiredConfirmations, []);
+});
+
+test('reactivates an inactive historical membership without creating a second logical membership', () => {
+  const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
+  const result = plan({
+    players: [existing],
+    memberships: [
+      membership({ id: 'roster-old', playerId: 'player-1', teamId: 'team-sea', teamName: 'Sea', isActive: false })
+    ],
+    name: 'Returning Player',
+    email: 'returning@example.com'
+  });
+  assert.equal(result.action, 'ASSIGN_PLAYER');
+  assert.equal(result.destinationMembership.id, 'roster-old');
+  assert.equal(result.changed, true);
+});
+
+test('moves back to a former team by reactivating its existing membership', () => {
+  const result = planAdminRosterAssignment({
+    playerId: 'player-1',
+    playerName: 'Returning Player',
+    memberships: [
+      membership({ id: 'roster-current', playerId: 'player-1', teamId: 'team-e', teamName: 'E' }),
+      membership({ id: 'roster-former', playerId: 'player-1', teamId: 'team-sea', teamName: 'Sea', isActive: false })
+    ],
+    destinationTeamId: 'team-sea',
+    hasOpenLeagueGame: false
+  });
+  assert.equal(result.action, 'MOVE_PLAYER');
+  assert.equal(result.activeMembership.id, 'roster-current');
+  assert.equal(result.destinationMembership.id, 'roster-former');
+});
+
+test('rejects multiple active memberships instead of guessing which one to change', () => {
+  const existing = player({ id: 'player-1', name: 'Returning Player', email: 'returning@example.com' });
+  expectCode('CONFLICT', () =>
+    plan({
+      players: [existing],
+      memberships: [
+        membership({ id: 'roster-1', playerId: 'player-1', teamId: 'team-e', teamName: 'E' }),
+        membership({ id: 'roster-2', playerId: 'player-1', teamId: 'team-f', teamName: 'F' })
+      ],
+      name: 'Returning Player',
+      email: 'returning@example.com'
+    })
+  );
+});
+
+test('plans an exact-player unassignment and requires confirmation', () => {
+  const result = planAdminRosterAssignment({
+    playerId: 'player-1',
+    playerName: 'Returning Player',
+    memberships: [membership({ id: 'roster-1', playerId: 'player-1', teamId: 'team-e', teamName: 'E' })],
+    destinationTeamId: null,
+    hasOpenLeagueGame: false
+  });
+  assert.equal(result.action, 'UNASSIGN_PLAYER');
+  assert.deepEqual(result.requiredConfirmations, ['UNASSIGN_PLAYER']);
+});
+
+test('blocks moving or unassigning a player who is in an open League game', () => {
+  expectCode('CONFLICT', () =>
+    planAdminRosterAssignment({
+      playerId: 'player-1',
+      playerName: 'Returning Player',
+      memberships: [membership({ id: 'roster-1', playerId: 'player-1', teamId: 'team-e', teamName: 'E' })],
+      destinationTeamId: 'team-sea',
+      hasOpenLeagueGame: true
+    })
+  );
+});
+
+test('returns a no-op when an unassigned player is unassigned again', () => {
+  const result = planAdminRosterAssignment({
+    playerId: 'player-1',
+    playerName: 'Returning Player',
+    memberships: [],
+    destinationTeamId: null,
+    hasOpenLeagueGame: false
+  });
+  assert.equal(result.action, 'NO_CHANGE');
+  assert.equal(result.changed, false);
 });
 
 test('rejects multiple normalized name matches instead of choosing one', () => {

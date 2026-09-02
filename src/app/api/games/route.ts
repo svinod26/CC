@@ -208,6 +208,7 @@ export async function POST(req: Request) {
         const rosterSlots = await tx.teamRoster.findMany({
           where: {
             seasonId: data.seasonId,
+            isActive: true,
             OR: [
               { teamId: homeTeamId, playerId: { in: resolvedHomeLineupIds } },
               { teamId: awayTeamId, playerId: { in: resolvedAwayLineupIds } }

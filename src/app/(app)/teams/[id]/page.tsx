@@ -5,6 +5,7 @@ import { defaultMultipliers, isMake, winnerFromGameState } from '@/lib/stats';
 import { Sparkline } from '@/components/sparkline';
 import { PlayerLink } from '@/components/player-link';
 import { ResultType } from '@prisma/client';
+import { sortSeasons } from '@/lib/season';
 
 const weightFor = (resultType: ResultType) => {
   const base =
@@ -36,17 +37,24 @@ type PlayerImpact = {
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const team = await prisma.team.findUnique({
-    where: { id },
-    include: {
-      season: true,
-      conference: true,
-      rosters: { include: { player: true } }
-    }
-  });
-  const playerNameById = new Map(team?.rosters.map((r) => [r.playerId, r.player.name]));
+  const [team, seasons] = await Promise.all([
+    prisma.team.findUnique({
+      where: { id },
+      include: {
+        season: true,
+        conference: true,
+        rosters: { include: { player: true } }
+      }
+    }),
+    prisma.season.findMany({ select: { id: true, name: true, year: true } })
+  ]);
 
   if (!team) return notFound();
+  const latestSeasonId = sortSeasons(seasons)[0]?.id ?? null;
+  const displayedRosters =
+    team.seasonId === latestSeasonId
+      ? team.rosters.filter((roster) => roster.isActive)
+      : team.rosters;
 
   const gamesRaw = await prisma.game.findMany({
     where: { OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] },
@@ -56,8 +64,8 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       awayTeam: true,
       state: true,
       scheduleEntry: true,
-      events: true,
-      legacyStats: true,
+      events: { include: { shooter: true } },
+      legacyStats: { include: { player: true } },
       legacyTeamStats: true
     }
   });
@@ -111,7 +119,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
         const current = playerImpact.get(stat.playerId) ?? {
           id: stat.playerId,
-          name: playerNameById.get(stat.playerId) ?? 'Unknown',
+          name: stat.player.name,
           makes: 0,
           attempts: 0,
           trackedAttempts: 0,
@@ -142,7 +150,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       if (!event.shooterId) continue;
       const current = playerImpact.get(event.shooterId) ?? {
         id: event.shooterId,
-        name: playerNameById.get(event.shooterId) ?? 'Unknown',
+        name: event.shooter?.name ?? 'Unknown',
         makes: 0,
         attempts: 0,
         trackedAttempts: 0,
@@ -242,12 +250,12 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <div className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-5">
           <h2 className="text-lg font-semibold text-ink">Roster</h2>
           <div className="mt-3 flex flex-wrap gap-2">
-            {team.rosters.map((r) => (
+            {displayedRosters.map((r) => (
               <span key={r.id} className="rounded-full bg-gold-50 px-2 py-0.5 text-xs text-ink">
                 <PlayerLink id={r.player.id} name={r.player.name} className="text-ink hover:text-garnet-600" />
               </span>
             ))}
-            {team.rosters.length === 0 && <span className="text-xs text-ash">No roster loaded.</span>}
+            {displayedRosters.length === 0 && <span className="text-xs text-ash">No active roster loaded.</span>}
           </div>
         </div>
       </section>

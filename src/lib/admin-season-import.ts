@@ -174,7 +174,8 @@ export async function commitSeasonImport({
             data: {
               seasonId: season.id,
               teamId: teamIds.get(row.teamId)!,
-              playerId: row.playerId!
+              playerId: row.playerId!,
+              isActive: true
             }
           });
           if (row.rememberAlias) {

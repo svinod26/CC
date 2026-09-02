@@ -19,6 +19,7 @@ export default async function NewGamePage() {
         where: { seasonId: matchingSeason.id },
         include: {
           rosters: {
+            where: { isActive: true },
             include: { player: true }
           }
         },

@@ -76,6 +76,8 @@ export default async function AdminPage({
         rosters: {
           select: {
             createdAt: true,
+            seasonId: true,
+            isActive: true,
             team: { select: { name: true } },
             season: { select: { name: true, year: true } }
           }
@@ -97,14 +99,23 @@ export default async function AdminPage({
     const linkedUser = matchingUsers.length === 1 ? matchingUsers[0] : null;
     if (linkedUser) linkedUserIds.add(linkedUser.id);
 
-    const latestRoster = [...player.rosters].sort((a, b) => {
+    const activeLatestRoster = latestSeason
+      ? player.rosters.find(
+          (roster) => roster.seasonId === latestSeason.id && roster.isActive
+        ) ?? null
+      : null;
+    const latestRoster = activeLatestRoster ?? [...player.rosters].sort((a, b) => {
       const yearDifference = (b.season?.year ?? -1) - (a.season?.year ?? -1);
       if (yearDifference !== 0) return yearDifference;
       return b.createdAt.getTime() - a.createdAt.getTime();
     })[0];
-    const teamContext = latestRoster
-      ? [latestRoster.team?.name, latestRoster.season?.name].filter(Boolean).join(' · ') || null
-      : null;
+    const teamContext = latestSeason
+      ? activeLatestRoster
+        ? [activeLatestRoster.team?.name, latestSeason.name].filter(Boolean).join(' · ')
+        : `Unassigned · ${latestSeason.name}`
+      : latestRoster
+        ? [latestRoster.team?.name, latestRoster.season?.name].filter(Boolean).join(' · ') || null
+        : null;
 
     return {
       targetType: 'PLAYER',
@@ -186,6 +197,24 @@ export default async function AdminPage({
               teams: latestSeason.teams
             }
           : null}
+        players={players.map((player) => {
+          const latestMemberships = latestSeason
+            ? player.rosters.filter((roster) => roster.seasonId === latestSeason.id)
+            : [];
+          const activeMemberships = latestMemberships.filter((roster) => roster.isActive);
+          return {
+            id: player.id,
+            name: player.name,
+            email: player.email,
+            activeTeamName:
+              activeMemberships.length === 1
+                ? activeMemberships[0].team?.name ?? null
+                : activeMemberships.length > 1
+                  ? 'Data integrity error: multiple active teams'
+                  : null,
+            hasMultipleActiveTeams: activeMemberships.length > 1
+          };
+        })}
       />
 
       <AdminEmailManager identities={emailIdentities} />
