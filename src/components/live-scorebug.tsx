@@ -1,30 +1,8 @@
 'use client';
 
-import useSWR from 'swr';
+import { useGameData } from '@/components/game-data-provider';
 import { ResultType, StatsSource } from '@prisma/client';
 import { winnerFromGameState } from '@/lib/stats';
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to load game state');
-  return res.json();
-};
-
-type LiveGame = {
-  id: string;
-  statsSource: StatsSource;
-  homeTeam: { id: string; name: string } | null;
-  awayTeam: { id: string; name: string } | null;
-  state: {
-    homeCupsRemaining: number;
-    awayCupsRemaining: number;
-    phase?: string | null;
-    status?: string | null;
-    possessionTeamId?: string | null;
-  } | null;
-  events: { resultType: ResultType; cupsDelta: number; offenseTeamId?: string | null }[];
-  legacyTeamStats?: { teamId: string | null; pulledCups: number }[];
-};
 
 const makeResultTypes = new Set<ResultType>([
   ResultType.TOP_REGULAR,
@@ -51,11 +29,8 @@ function possessiveTeamLabel(name: string) {
   return name.endsWith('s') ? `${name}'` : `${name}'s`;
 }
 
-export function LiveScorebug({ gameId, initialData }: { gameId: string; initialData: LiveGame }) {
-  const { data } = useSWR<LiveGame>(`/api/games/${gameId}/state`, fetcher, {
-    fallbackData: initialData,
-    refreshInterval: 1200
-  });
+export function LiveScorebug() {
+  const { data } = useGameData();
 
   if (!data) return null;
 

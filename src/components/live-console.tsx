@@ -1,40 +1,10 @@
 'use client';
 
-import { GameState, GameType, ResultType, Team, GameLineup, Player, Turn } from '@prisma/client';
-import useSWR from 'swr';
+import { ResultType } from '@prisma/client';
+import { useGameData } from '@/components/game-data-provider';
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { isMake } from '@/lib/stats';
-
-type LineupWithPlayer = GameLineup & { player: Player };
-type TurnWithEvents = Turn & {
-  events: {
-    id: string;
-    shooterId: string | null;
-    shooter: Player | null;
-    resultType: ResultType;
-    timestamp: string | Date;
-  }[];
-};
-
-type GameStatePayload = {
-  id: string;
-  type: GameType;
-  homeTeam: Team | null;
-  awayTeam: Team | null;
-  state: GameState | null;
-  lineups: LineupWithPlayer[];
-  turns: TurnWithEvents[];
-};
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error('Failed to load game state');
-  }
-  return res.json();
-};
 
 const touchClass = 'touch-manipulation select-none active:scale-[0.98]';
 
@@ -47,18 +17,12 @@ const shortenTeam = (name: string | null | undefined, max = 14) => {
 
 export function LiveConsole({
   gameId,
-  initialData,
   isScorer
 }: {
   gameId: string;
-  initialData: GameStatePayload;
   isScorer: boolean;
 }) {
-  const { data, mutate } = useSWR<GameStatePayload | null>(`/api/games/${gameId}/state`, fetcher, {
-    fallbackData: initialData,
-    refreshInterval: isScorer ? 700 : 1000,
-    revalidateOnFocus: true
-  });
+  const { data, mutate } = useGameData();
   const router = useRouter();
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [adjustCount, setAdjustCount] = useState(1);

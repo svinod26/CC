@@ -12,6 +12,8 @@ import { GameFlowChart } from '@/components/game-flow-chart';
 import { LiveGameInsights } from '@/components/live-game-insights';
 import { DeleteGameButton } from '@/components/delete-game-button';
 import { formatGameDuration } from '@/lib/game-duration';
+import { GameDataProvider } from '@/components/game-data-provider';
+import { attachTurnEvents, gameTurnSelect, gameViewSelect } from '@/lib/game-view';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -23,42 +25,28 @@ export const viewport: Viewport = {
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerAuthSession();
-  const game = await prisma.game.findUnique({
+  const record = await prisma.game.findUnique({
     where: { id },
-    include: {
-      homeTeam: true,
-      awayTeam: true,
-      state: true,
-      scheduleEntry: true,
-      statTaker: true,
-      lineups: { include: { player: true } },
+    select: {
+      ...gameViewSelect,
+      statTakerId: true,
+      statTaker: { select: { email: true } },
       turns: {
         orderBy: { turnIndex: 'asc' },
-        include: {
-          events: { orderBy: [{ timestamp: 'asc' }, { id: 'asc' }], include: { shooter: true } },
-          offenseTeam: true
-        }
-      },
-      events: { include: { shooter: true }, orderBy: [{ timestamp: 'asc' }, { id: 'asc' }] },
-      legacyStats: { include: { player: true } },
-      legacyTeamStats: true
+        select: { ...gameTurnSelect, offenseTeam: { select: { name: true } } }
+      }
     }
   });
 
-  if (!game) return notFound();
+  if (!record) return notFound();
+  const game = { ...record, turns: attachTurnEvents(record.turns, record.events) };
 
   const isLegacy = game.statsSource === 'LEGACY';
 
   const initialTurn = game.turns[game.turns.length - 1] ? [game.turns[game.turns.length - 1]] : [];
-  const initialData = {
-    id: game.id,
-    type: game.type,
-    homeTeam: game.homeTeam,
-    awayTeam: game.awayTeam,
-    state: game.state,
-    lineups: game.lineups,
-    turns: initialTurn as any
-  };
+  // Scorer identity is server-only; never pass it through to the client provider.
+  const { statTaker: _statTaker, statTakerId: _statTakerId, ...publicGame } = game;
+  const initialData = { ...publicGame, turns: initialTurn };
 
   const homeRemaining = game.state?.homeCupsRemaining ?? 100;
   const awayRemaining = game.state?.awayCupsRemaining ?? 100;
@@ -134,6 +122,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     return groups;
   }, []);
   return (
+    <GameDataProvider key={game.id} initialData={initialData}>
     <div className="space-y-5 sm:space-y-6">
       <section className="rounded-2xl border border-garnet-100 bg-white/85 p-4 shadow sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -172,18 +161,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
                 />
               </div>
             ) : (
-              <LiveScorebug
-                gameId={game.id}
-                initialData={{
-                  id: game.id,
-                  statsSource: game.statsSource,
-                  homeTeam: game.homeTeam,
-                  awayTeam: game.awayTeam,
-                  state: game.state,
-                  events: game.events,
-                  legacyTeamStats: game.legacyTeamStats
-                }}
-              />
+              <LiveScorebug />
             )}
           </div>
         </div>
@@ -191,7 +169,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
 
       {showConsole && (
         <div>
-          <LiveConsole gameId={game.id} initialData={initialData as any} isScorer={canScore} />
+          <LiveConsole gameId={game.id} isScorer={canScore} />
         </div>
       )}
 
@@ -201,27 +179,16 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
         </section>
       )}
 
-      <LiveBoxScores gameId={game.id} initialData={game as any} />
+      <LiveBoxScores />
 
-      <LiveGameInsights
-        gameId={game.id}
-        isLive={game.status === 'IN_PROGRESS'}
-        initialData={{
-          statsSource: game.statsSource,
-          events: game.events as any,
-          legacyStats: game.legacyStats as any
-        }}
-      />
+      <LiveGameInsights />
 
       {canRenderFlowChart && (
         <GameFlowChart
-          gameId={game.id}
           homeTeamId={game.homeTeamId as string}
           awayTeamId={game.awayTeamId as string}
           homeTeamName={game.homeTeam?.name ?? 'Home'}
           awayTeamName={game.awayTeam?.name ?? 'Away'}
-          initialEvents={game.events as any}
-          isLive={showConsole}
         />
       )}
 
@@ -266,6 +233,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
         </section>
       )}
     </div>
+    </GameDataProvider>
   );
 }
 

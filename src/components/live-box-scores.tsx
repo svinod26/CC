@@ -1,40 +1,11 @@
 'use client';
 
-import { ResultType } from '@prisma/client';
-import useSWR from 'swr';
+import type { GameView } from '@/lib/game-view';
+import { useGameData } from '@/components/game-data-provider';
 import { boxScore } from '@/lib/stats';
 import { PlayerLink } from '@/components/player-link';
 
-type LineupSlot = {
-  id: string;
-  teamId: string | null;
-  orderIndex: number;
-  player: { id: string; name: string | null };
-};
-
-type GameStatePayload = {
-  id: string;
-  homeTeam: { id: string; name: string } | null;
-  awayTeam: { id: string; name: string } | null;
-  events: {
-    id: string;
-    shooterId: string | null;
-    shooter: { id: string; name: string | null } | null;
-    resultType: ResultType;
-  }[];
-  legacyStats: {
-    playerId: string;
-    player: { id: string; name: string | null } | null;
-    teamId: string | null;
-    totalCups: number;
-    topRegular: number;
-    topIso: number;
-    bottomRegular: number;
-    bottomIso: number;
-    misses: number;
-  }[];
-  lineups: LineupSlot[];
-};
+type LineupSlot = GameView['lineups'][number];
 
 type BoxRow = {
   id: string;
@@ -48,13 +19,7 @@ type BoxRow = {
   misses: number;
 };
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to load game state');
-  return res.json();
-};
-
-const buildLegacyBox = (stats: GameStatePayload['legacyStats']) => {
+const buildLegacyBox = (stats: GameView['legacyStats']) => {
   const map = new Map<string, BoxRow>();
   stats.forEach((stat) => {
     const breakdown = stat.topRegular + stat.topIso + stat.bottomRegular + stat.bottomIso;
@@ -87,17 +52,8 @@ const blankRow = (id: string, name: string): BoxRow => ({
   misses: 0
 });
 
-export function LiveBoxScores({
-  gameId,
-  initialData
-}: {
-  gameId: string;
-  initialData: GameStatePayload;
-}) {
-  const { data } = useSWR<GameStatePayload>(`/api/games/${gameId}/state`, fetcher, {
-    fallbackData: initialData,
-    refreshInterval: 1000
-  });
+export function LiveBoxScores() {
+  const { data } = useGameData();
 
   if (!data) return null;
 

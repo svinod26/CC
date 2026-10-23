@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR from 'swr';
+import { useGameData } from '@/components/game-data-provider';
 
 type FlowEvent = {
   id: string;
@@ -21,12 +21,6 @@ type Segment = {
   x2: number;
   y2: number;
   color: string;
-};
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to load game state');
-  return res.json();
 };
 
 const buildSeries = (
@@ -79,31 +73,19 @@ const buildSeries = (
 };
 
 export function GameFlowChart({
-  gameId,
   homeTeamId,
   awayTeamId,
   homeTeamName,
-  awayTeamName,
-  initialEvents,
-  isLive
+  awayTeamName
 }: {
-  gameId: string;
   homeTeamId: string;
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
-  initialEvents: FlowEvent[];
-  isLive: boolean;
 }) {
-  const { data } = useSWR<{ events: FlowEvent[] }>(
-    `/api/games/${gameId}/state`,
-    fetcher,
-    {
-      fallbackData: { events: initialEvents },
-      refreshInterval: isLive ? 1200 : 0
-    }
-  );
-  const events = data?.events ?? initialEvents;
+  const { data } = useGameData();
+  if (!data) return null;
+  const events = data.events;
   const { points, finalDiff, homeLeadMax, awayLeadMax } = buildSeries(
     events,
     homeTeamId,

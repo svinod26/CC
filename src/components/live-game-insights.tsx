@@ -1,59 +1,20 @@
 'use client';
 
-import useSWR from 'swr';
-import { ResultType, StatsSource } from '@prisma/client';
+import { useGameData } from '@/components/game-data-provider';
 import { advancedStats, baseRatingStats, boxScore, defaultMultipliers } from '@/lib/stats';
 import { PlayerLink } from '@/components/player-link';
 
-type LiveInsightsData = {
-  statsSource: StatsSource;
-  events: Array<{
-    id: string;
-    shooterId: string | null;
-    shooter: { id: string; name: string | null } | null;
-    resultType: ResultType;
-    remainingCupsBefore?: number | null;
-  }>;
-  legacyStats: Array<{
-    playerId: string;
-    player: { id: string; name: string | null } | null;
-    totalCups: number;
-    topRegular: number;
-    topIso: number;
-    bottomRegular: number;
-    bottomIso: number;
-    misses: number;
-  }>;
-};
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to load game state');
-  return res.json();
-};
-
-export function LiveGameInsights({
-  gameId,
-  isLive,
-  initialData
-}: {
-  gameId: string;
-  isLive: boolean;
-  initialData: LiveInsightsData;
-}) {
-  const { data } = useSWR<LiveInsightsData>(`/api/games/${gameId}/state`, fetcher, {
-    fallbackData: initialData,
-    refreshInterval: isLive ? 1200 : 0
-  });
-
-  const statsSource = data?.statsSource ?? initialData.statsSource;
+export function LiveGameInsights() {
+  const { data } = useGameData();
+  if (!data) return null;
+  const statsSource = data.statsSource;
   const isLegacy = statsSource === 'LEGACY';
-  const events = data?.events ?? initialData.events;
-  const legacyStats = data?.legacyStats ?? initialData.legacyStats;
+  const events = data.events;
+  const legacyStats = data.legacyStats;
 
   const fullBox = !isLegacy ? boxScore(events) : new Map();
-  const baseRatings = !isLegacy ? baseRatingStats(events as any, defaultMultipliers) : new Map();
-  const tempoRatings = !isLegacy ? advancedStats(events as any, defaultMultipliers) : new Map();
+  const baseRatings = !isLegacy ? baseRatingStats(events, defaultMultipliers) : new Map();
+  const tempoRatings = !isLegacy ? advancedStats(events, defaultMultipliers) : new Map();
 
   const ratingRows = isLegacy
     ? legacyStats

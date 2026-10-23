@@ -1,4 +1,4 @@
-import { ResultType, ShotEvent, StatsSource } from '@prisma/client';
+import { ResultType, type ShotEvent, StatsSource } from '@prisma/client';
 
 export type Multipliers = {
   top: number;
@@ -130,7 +130,7 @@ export function boxScore(events: ShotLike[]) {
 }
 
 export function advancedStats(
-  events: (ShotEvent & { shooter?: { id: string; name: string | null } | null })[],
+  events: (ShotLike & Pick<ShotEvent, 'remainingCupsBefore'>)[],
   multipliers: Multipliers = defaultMultipliers
 ) {
   const perPlayer = new Map<
@@ -143,7 +143,7 @@ export function advancedStats(
     }
   >();
 
-  const weightFor = (event: ShotEvent) => {
+  const weightFor = (event: ShotLike & Pick<ShotEvent, 'remainingCupsBefore'>) => {
     const base =
       event.resultType === ResultType.TOP_REGULAR
         ? multipliers.top
@@ -174,7 +174,7 @@ export function advancedStats(
 }
 
 export function baseRatingStats(
-  events: (ShotEvent & { shooter?: { id: string; name: string | null } | null })[],
+  events: ShotLike[],
   multipliers: Multipliers = defaultMultipliers
 ) {
   const perPlayer = new Map<
@@ -187,7 +187,7 @@ export function baseRatingStats(
     }
   >();
 
-  const baseWeightFor = (event: ShotEvent) => {
+  const baseWeightFor = (event: ShotLike) => {
     return event.resultType === ResultType.TOP_REGULAR
       ? multipliers.top
       : event.resultType === ResultType.TOP_ISO
