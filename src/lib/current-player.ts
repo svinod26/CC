@@ -10,7 +10,8 @@ export async function getCurrentPlayerForUserId(userId: string) {
 
   const canonicalUserEmail = canonicalizeEmail(user.email);
   const players = await prisma.player.findMany({
-    where: { email: { not: null } }
+    where: { email: { not: null } },
+    select: { id: true, email: true }
   });
   const matches = players.filter(
     (player) => player.email && canonicalizeEmail(player.email) === canonicalUserEmail

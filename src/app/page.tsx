@@ -88,7 +88,7 @@ export default async function HomePage() {
   const latestWeekGames = latestWeek
     ? await prisma.game.findMany({
         where: { seasonId: currentSeason.id, scheduleEntry: { week: latestWeek } },
-        include: { homeTeam: true, awayTeam: true, state: true, events: true, legacyStats: true }
+        include: { homeTeam: true, awayTeam: true, state: true }
       })
     : [];
   const [weeklyEvents, weeklyLegacy] = latestWeek
@@ -96,14 +96,20 @@ export default async function HomePage() {
         prisma.shotEvent.findMany({
           where: {
             shooterId: { not: null },
-            resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
             game: { seasonId: currentSeason.id, scheduleEntry: { week: latestWeek } }
           },
-          include: { shooter: true }
+          select: {
+            gameId: true, shooterId: true, resultType: true, remainingCupsBefore: true,
+            shooter: { select: { name: true } }
+          }
         }),
         prisma.legacyPlayerStat.findMany({
           where: { game: { seasonId: currentSeason.id, scheduleEntry: { week: latestWeek } } },
-          include: { player: true }
+          select: {
+            gameId: true, playerId: true, totalCups: true, topRegular: true, topIso: true,
+            bottomRegular: true, bottomIso: true, misses: true,
+            player: { select: { name: true } }
+          }
         })
       ])
     : [[], []];
@@ -449,8 +455,8 @@ export default async function HomePage() {
               const gameId =
                 latestWeekGames.find((game) =>
                   game.statsSource === 'LEGACY'
-                    ? game.legacyStats.some((stat) => stat.playerId === player.id)
-                    : game.events.some((event) => event.shooterId === player.id)
+                    ? weeklyLegacy.some((stat) => stat.gameId === game.id && stat.playerId === player.id)
+                    : weeklyEvents.some((event) => event.gameId === game.id && event.shooterId === player.id)
                 )?.id ?? null;
               const content = (
                 <div className="flex w-full flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

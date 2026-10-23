@@ -137,7 +137,11 @@ export default async function PlayerComparePage({
           resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
           ...(Object.keys(gameWhere).length ? { game: gameWhere } : {})
         },
-        include: { shooter: true, game: { include: { scheduleEntry: true } } },
+        select: {
+          shooterId: true, gameId: true, resultType: true, remainingCupsBefore: true,
+          shooter: { select: { name: true } },
+          game: { select: { scheduleEntry: { select: { week: true } } } }
+        },
         orderBy: { timestamp: 'asc' }
       })
     : [];
@@ -148,7 +152,12 @@ export default async function PlayerComparePage({
           playerId: { in: selectedIds },
           ...(Object.keys(gameWhere).length ? { game: gameWhere } : {})
         },
-        include: { player: true, game: { include: { scheduleEntry: true } } }
+        select: {
+          playerId: true, gameId: true, totalCups: true, topRegular: true,
+          topIso: true, bottomRegular: true, bottomIso: true, misses: true,
+          player: { select: { name: true } },
+          game: { select: { scheduleEntry: { select: { week: true } } } }
+        }
       })
     : [];
 
@@ -157,11 +166,16 @@ export default async function PlayerComparePage({
       shooterId: { not: null },
       resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
       ...(Object.keys(gameWhere).length ? { game: gameWhere } : {})
-    }
+    },
+    select: { shooterId: true, gameId: true, resultType: true }
   });
   const leagueLegacyStats = await prisma.legacyPlayerStat.findMany({
     where: {
       ...(Object.keys(gameWhere).length ? { game: gameWhere } : {})
+    },
+    select: {
+      playerId: true, gameId: true, totalCups: true, topRegular: true,
+      topIso: true, bottomRegular: true, bottomIso: true, misses: true
     }
   });
 

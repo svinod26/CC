@@ -58,7 +58,7 @@ export default async function TeamsPage({
       conference: true,
       rosters: {
         ...(season?.id === orderedSeasons[0]?.id ? { where: { isActive: true } } : {}),
-        include: { player: true }
+        select: { player: { select: { id: true, name: true } } }
       }
     }
   });
@@ -72,19 +72,26 @@ export default async function TeamsPage({
     where: {
       resultType: { notIn: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
       ...(season ? { game: { seasonId: season.id } } : {})
-    }
+    },
+    select: { offenseTeamId: true, resultType: true, remainingCupsBefore: true, remainingCupsAfter: true }
   });
   const pullEvents = await prisma.shotEvent.findMany({
     where: {
       resultType: { in: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
       ...(season ? { game: { seasonId: season.id } } : {})
-    }
+    },
+    select: { defenseTeamId: true, cupsDelta: true }
   });
   const legacyTeamStats = await prisma.legacyTeamStat.findMany({
-    where: season ? { game: { seasonId: season.id } } : {}
+    where: season ? { game: { seasonId: season.id } } : {},
+    select: { teamId: true, pulledCups: true }
   });
   const legacyStats = await prisma.legacyPlayerStat.findMany({
-    where: season ? { game: { seasonId: season.id } } : {}
+    where: season ? { game: { seasonId: season.id } } : {},
+    select: {
+      teamId: true, totalCups: true, topRegular: true, topIso: true,
+      bottomRegular: true, bottomIso: true, misses: true
+    }
   });
 
   const teamStats = new Map<string, TeamAgg>();

@@ -85,9 +85,15 @@ export async function PlayerDashboard({
         ...(gameType ? { type: gameType } : {}),
         OR: [{ events: { some: {} } }, { legacyStats: { some: {} } }]
       },
-      include: {
-        events: true,
-        legacyStats: true
+      select: {
+        statsSource: true,
+        events: { select: { shooterId: true, resultType: true } },
+        legacyStats: {
+          select: {
+            playerId: true, totalCups: true, topRegular: true, topIso: true,
+            bottomRegular: true, bottomIso: true, misses: true
+          }
+        }
       }
     })
   ]);

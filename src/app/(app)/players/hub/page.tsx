@@ -74,14 +74,24 @@ export default async function PlayerHubPage({
       resultType: { notIn: ['PULL_HOME', 'PULL_AWAY'] },
       ...(hasGameWhere ? { game: gameWhere } : {})
     },
-    include: { shooter: true, game: { include: { scheduleEntry: true } } },
+    select: {
+      shooterId: true, gameId: true, resultType: true,
+      remainingCupsBefore: true, remainingCupsAfter: true,
+      shooter: { select: { name: true } },
+      game: { select: { scheduleEntry: { select: { week: true } } } }
+    },
     orderBy: { timestamp: 'desc' }
   });
   const legacyStats = await prisma.legacyPlayerStat.findMany({
     where: {
       ...(hasGameWhere ? { game: gameWhere } : {})
     },
-    include: { player: true, game: { include: { scheduleEntry: true } } }
+    select: {
+      playerId: true, gameId: true, totalCups: true, topRegular: true,
+      topIso: true, bottomRegular: true, bottomIso: true, misses: true,
+      player: { select: { name: true } },
+      game: { select: { scheduleEntry: { select: { week: true } } } }
+    }
   });
 
   const players = new Map<string, PlayerAgg>();

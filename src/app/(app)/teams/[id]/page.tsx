@@ -43,7 +43,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       include: {
         season: true,
         conference: true,
-        rosters: { include: { player: true } }
+        rosters: { select: { id: true, isActive: true, player: { select: { id: true, name: true } } } }
       }
     }),
     prisma.season.findMany({ select: { id: true, name: true, year: true } })
@@ -64,9 +64,22 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       awayTeam: true,
       state: true,
       scheduleEntry: true,
-      events: { include: { shooter: true } },
-      legacyStats: { include: { player: true } },
-      legacyTeamStats: true
+      events: {
+        where: { offenseTeamId: team.id },
+        select: {
+          offenseTeamId: true, resultType: true, shooterId: true, remainingCupsBefore: true,
+          shooter: { select: { name: true } }
+        }
+      },
+      legacyStats: {
+        where: { teamId: team.id },
+        select: {
+          teamId: true, playerId: true, totalCups: true, topRegular: true, topIso: true,
+          bottomRegular: true, bottomIso: true, misses: true,
+          player: { select: { name: true } }
+        }
+      },
+      legacyTeamStats: { where: { teamId: team.id }, select: { teamId: true, pulledCups: true } }
     }
   });
   const games = gamesRaw;
@@ -75,7 +88,8 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     where: {
       resultType: { in: [ResultType.PULL_HOME, ResultType.PULL_AWAY] },
       defenseTeamId: team.id
-    }
+    },
+    select: { cupsDelta: true }
   });
 
   const totalPulled =
